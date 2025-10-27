@@ -35,10 +35,12 @@ env/
 
 # Logs
 logs/
+!logs/.gitkeep
 *.log
 
 # Backups
 backups/
+!backups/.gitkeep
 *.sql.gz
 *.sql.bak
 
@@ -49,7 +51,9 @@ backups/
 
 # Temporary files
 tmp/
+!tmp/.gitkeep
 temp/
+!temp/.gitkeep
 *.tmp
 
 # OS
@@ -59,7 +63,9 @@ desktop.ini
 
 # Application specific
 resources/temp/
+!resources/temp/.gitkeep
 uploads/
+!uploads/.gitkeep
 
 # Sensitive data
 .env
@@ -69,6 +75,7 @@ secrets.json
 # Reports generated
 reports/*.pdf
 reports/*.xlsx
+!reports/.gitkeep
 
 # Python egg files
 *.egg-info/
