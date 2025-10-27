@@ -92,8 +92,11 @@ class MainCaixa:
         )
         btn_abrir.pack()
         
-        # Bind Enter
+        # Configurar navegação por teclado
         self.window.bind('<Return>', lambda e: self.abrir_caixa())
+        self.window.bind('<Escape>', lambda e: self.on_closing())
+        self.window.bind('<Tab>', self._navegar_proximo)
+        self.window.bind('<Shift-Tab>', self._navegar_anterior)
     
     def abrir_caixa(self):
         """Abre o caixa."""
@@ -254,6 +257,18 @@ class MainCaixa:
         self.window.destroy()
         from src.ui.login_window import LoginWindow
         LoginWindow(self.master)
+    
+    def _navegar_proximo(self, event=None):
+        """Navega para o próximo widget."""
+        if event:
+            event.widget.tk_focusNext().focus()
+            return 'break'
+    
+    def _navegar_anterior(self, event=None):
+        """Navega para o widget anterior."""
+        if event:
+            event.widget.tk_focusPrev().focus()
+            return 'break'
     
     def on_closing(self):
         """Trata o fechamento da janela."""

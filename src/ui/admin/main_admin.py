@@ -32,6 +32,9 @@ class MainAdmin:
         # Criar interface
         self.criar_widgets()
         
+        # Configurar navegação por teclado
+        self.configurar_navegacao_teclado()
+        
         # Carrega dashboard inicial
         self.mostrar_dashboard()
     
@@ -47,6 +50,9 @@ class MainAdmin:
         # Área de trabalho
         self.area_trabalho = ttk.Frame(container, relief=tk.FLAT)
         self.area_trabalho.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Lista para navegação pelos botões do menu
+        self.botoes_menu = []
     
     def criar_menu_lateral(self, parent):
         """Cria o menu lateral."""
@@ -79,18 +85,22 @@ class MainAdmin:
         tk.Frame(menu_frame, bg="#1a252f", height=2).pack(fill=tk.X, pady=5)
         
         # Botões do menu
-        self.criar_botao_menu(menu_frame, "📊 Dashboard", self.mostrar_dashboard)
-        self.criar_botao_menu(menu_frame, "📦 Produtos", self.mostrar_produtos)
-        self.criar_botao_menu(menu_frame, "🏷️ Categorias", self.mostrar_categorias)
-        self.criar_botao_menu(menu_frame, "📦 Estoque", self.mostrar_estoque)
-        self.criar_botao_menu(menu_frame, "👥 Usuários", self.mostrar_usuarios)
-        self.criar_botao_menu(menu_frame, "📈 Relatórios", self.mostrar_relatorios)
-        self.criar_botao_menu(menu_frame, "⚙️ Configurações", self.mostrar_configuracoes)
+        self.botoes_menu.append(self.criar_botao_menu(menu_frame, "📊 Dashboard", self.mostrar_dashboard))
+        self.botoes_menu.append(self.criar_botao_menu(menu_frame, "📦 Produtos", self.mostrar_produtos))
+        self.botoes_menu.append(self.criar_botao_menu(menu_frame, "🏷️ Categorias", self.mostrar_categorias))
+        self.botoes_menu.append(self.criar_botao_menu(menu_frame, "📦 Estoque", self.mostrar_estoque))
+        self.botoes_menu.append(self.criar_botao_menu(menu_frame, "👥 Usuários", self.mostrar_usuarios))
+        self.botoes_menu.append(self.criar_botao_menu(menu_frame, "📈 Relatórios", self.mostrar_relatorios))
+        self.botoes_menu.append(self.criar_botao_menu(menu_frame, "⚙️ Configurações", self.mostrar_configuracoes))
         
         # Botão sair no final
         tk.Frame(menu_frame, bg="#2c3e50").pack(fill=tk.BOTH, expand=True)
         
-        self.criar_botao_menu(menu_frame, "🚪 Sair", self.sair, bg="#c0392b")
+        self.botoes_menu.append(self.criar_botao_menu(menu_frame, "🚪 Sair", self.sair, bg="#c0392b"))
+        
+        # Configurar navegação dos botões
+        self.botao_ativo = 0
+        self.destacar_botao_ativo()
     
     def criar_botao_menu(self, parent, texto, comando, bg="#34495e"):
         """Cria um botão no menu lateral."""
@@ -286,6 +296,64 @@ class MainAdmin:
             self.window.destroy()
             from src.ui.login_window import LoginWindow
             LoginWindow(self.master)
+    
+    def configurar_navegacao_teclado(self):
+        """Configura navegação por teclado."""
+        # Binds globais para navegação no menu
+        self.window.bind('<Up>', self._navegar_menu_cima)
+        self.window.bind('<Down>', self._navegar_menu_baixo)
+        self.window.bind('<Return>', self._executar_botao_ativo)
+        self.window.bind('<space>', self._executar_botao_ativo)
+        self.window.bind('<Escape>', lambda e: self.sair())
+        
+        # Atalhos de teclado para cada função
+        self.window.bind('<F1>', lambda e: self.mostrar_dashboard())
+        self.window.bind('<F2>', lambda e: self.mostrar_produtos())
+        self.window.bind('<F3>', lambda e: self.mostrar_categorias())
+        self.window.bind('<F4>', lambda e: self.mostrar_estoque())
+        self.window.bind('<F5>', lambda e: self.mostrar_usuarios())
+        self.window.bind('<F6>', lambda e: self.mostrar_relatorios())
+        self.window.bind('<F7>', lambda e: self.mostrar_configuracoes())
+        
+        # Alt+F4 para sair
+        self.window.bind('<Alt-F4>', lambda e: self.sair())
+        
+        # Foco inicial
+        self.window.focus_set()
+    
+    def _navegar_menu_cima(self, event=None):
+        """Navega para cima no menu."""
+        self.botao_ativo = (self.botao_ativo - 1) % len(self.botoes_menu)
+        self.destacar_botao_ativo()
+        return 'break'
+    
+    def _navegar_menu_baixo(self, event=None):
+        """Navega para baixo no menu."""
+        self.botao_ativo = (self.botao_ativo + 1) % len(self.botoes_menu)
+        self.destacar_botao_ativo()
+        return 'break'
+    
+    def _executar_botao_ativo(self, event=None):
+        """Executa o botão ativo."""
+        if 0 <= self.botao_ativo < len(self.botoes_menu):
+            self.botoes_menu[self.botao_ativo].invoke()
+        return 'break'
+    
+    def destacar_botao_ativo(self):
+        """Destaca o botão ativo visualmente."""
+        for i, botao in enumerate(self.botoes_menu):
+            if i == self.botao_ativo:
+                # Botão ativo - destacado
+                if i == len(self.botoes_menu) - 1:  # Botão sair
+                    botao.config(bg="#e74c3c", relief=tk.RAISED, bd=2)
+                else:
+                    botao.config(bg="#4a5f7f", relief=tk.RAISED, bd=2)
+            else:
+                # Botão inativo - normal
+                if i == len(self.botoes_menu) - 1:  # Botão sair
+                    botao.config(bg="#c0392b", relief=tk.FLAT, bd=0)
+                else:
+                    botao.config(bg="#34495e", relief=tk.FLAT, bd=0)
     
     def on_closing(self):
         """Trata o fechamento da janela."""

@@ -28,6 +28,9 @@ class LoginWindow:
         # Criar interface
         self.criar_widgets()
         
+        # Configurar navegação por teclado
+        self.configurar_navegacao_teclado()
+        
         # Foco inicial no campo de usuário
         self.entry_username.focus()
         
@@ -157,6 +160,49 @@ class LoginWindow:
         else:
             from src.ui.caixa.main_caixa import MainCaixa
             MainCaixa(self.master, usuario)
+    
+    def configurar_navegacao_teclado(self):
+        """Configura a navegação por teclado."""
+        # Lista de widgets navegáveis
+        self.widgets_navegaveis = []
+        
+        # Adicionar widgets após criação na função criar_widgets
+        self.window.after(100, self._configurar_widgets_navegacao)
+        
+        # Binds globais
+        self.window.bind('<Tab>', self._navegar_proximo)
+        self.window.bind('<Shift-Tab>', self._navegar_anterior) 
+        self.window.bind('<Up>', self._navegar_anterior)
+        self.window.bind('<Down>', self._navegar_proximo)
+        self.window.bind('<Escape>', lambda e: self.on_closing())
+        
+    def _configurar_widgets_navegacao(self):
+        """Configura a lista de widgets navegáveis."""
+        self.widgets_navegaveis = [
+            self.entry_username,
+            self.entry_senha,
+            self.btn_login
+        ]
+        
+        # Configura Tab stops
+        for widget in self.widgets_navegaveis:
+            widget.bind('<Tab>', self._navegar_proximo)
+            widget.bind('<Shift-Tab>', self._navegar_anterior)
+            if hasattr(widget, 'bind'):
+                widget.bind('<Up>', self._navegar_anterior) 
+                widget.bind('<Down>', self._navegar_proximo)
+    
+    def _navegar_proximo(self, event=None):
+        """Navega para o próximo widget."""
+        if event:
+            event.widget.tk_focusNext().focus()
+            return 'break'
+    
+    def _navegar_anterior(self, event=None):
+        """Navega para o widget anterior.""" 
+        if event:
+            event.widget.tk_focusPrev().focus()
+            return 'break'
     
     def on_closing(self):
         """Trata o fechamento da janela."""
