@@ -5,10 +5,12 @@ Tela de relatórios.
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import date, timedelta
+from decimal import Decimal
 
 from src.dao.venda_dao import VendaDAO
 from src.dao.pagamento_dao import PagamentoDAO
 from src.dao.produto_dao import ProdutoDAO
+from src.config.database import DatabaseConnection
 from src.utils.formatters import Formatters
 
 
@@ -205,7 +207,101 @@ class RelatoriosFrame(ttk.Frame):
     
     def relatorio_produtos_vendidos(self):
         """Relatório de produtos mais vendidos."""
-        messagebox.showinfo("Em Desenvolvimento", "Relatório de produtos mais vendidos em desenvolvimento.")
+        # Busca dados do banco
+        conn = DatabaseConnection.get_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        try:
+            query = """
+                SELECT 
+                    p.id,
+                    p.codigo_barras,
+                    p.nome,
+                    SUM(iv.quantidade) as total_vendido,
+                    SUM(iv.subtotal) as receita_total,
+                    COUNT(DISTINCT v.id) as num_vendas
+                FROM produtos p
+                INNER JOIN itens_venda iv ON p.id = iv.produto_id
+                INNER JOIN vendas v ON iv.venda_id = v.id
+                WHERE v.cancelada = 0
+                GROUP BY p.id
+                ORDER BY total_vendido DESC
+                LIMIT 50
+            """
+            cursor.execute(query)
+            produtos = cursor.fetchall()
+            
+            if not produtos:
+                messagebox.showinfo("Aviso", "Nenhuma venda registrada ainda.")
+                return
+            
+            # Cria janela
+            w = tk.Toplevel(self)
+            w.title("Produtos Mais Vendidos")
+            w.geometry("900x600")
+            
+            main = ttk.Frame(w, padding="20")
+            main.pack(fill=tk.BOTH, expand=True)
+            
+            tk.Label(main, text="🏆 Top 50 Produtos Mais Vendidos", 
+                     font=("Arial", 16, "bold"), fg="#27ae60").pack(pady=(0, 15))
+            
+            tk.Label(main, text=f"Total de produtos: {len(produtos)}",
+                     font=("Arial", 12)).pack(pady=(0, 15))
+            
+            # Treeview
+            tree_frame = ttk.Frame(main)
+            tree_frame.pack(fill=tk.BOTH, expand=True)
+            
+            scroll = ttk.Scrollbar(tree_frame)
+            scroll.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            tree = ttk.Treeview(tree_frame, yscrollcommand=scroll.set,
+                columns=("pos", "codigo", "nome", "qtd", "vendas", "receita"), 
+                show="headings")
+            
+            tree.heading("pos", text="#")
+            tree.heading("codigo", text="Código")
+            tree.heading("nome", text="Produto")
+            tree.heading("qtd", text="Quantidade")
+            tree.heading("vendas", text="N° Vendas")
+            tree.heading("receita", text="Receita Total")
+            
+            tree.column("pos", width=50, anchor=tk.CENTER)
+            tree.column("codigo", width=120)
+            tree.column("nome", width=350)
+            tree.column("qtd", width=100, anchor=tk.CENTER)
+            tree.column("vendas", width=100, anchor=tk.CENTER)
+            tree.column("receita", width=120, anchor=tk.E)
+            
+            scroll.config(command=tree.yview)
+            tree.pack(fill=tk.BOTH, expand=True)
+            
+            # Preenche
+            for i, p in enumerate(produtos, 1):
+                tree.insert("", tk.END, values=(
+                    f"{i}º",
+                    p['codigo_barras'],
+                    p['nome'],
+                    f"{p['total_vendido']:.0f}",
+                    p['num_vendas'],
+                    Formatters.formatar_moeda(Decimal(str(p['receita_total'])))
+                ))
+            
+            # Totais
+            total_receita = sum(Decimal(str(p['receita_total'])) for p in produtos)
+            tk.Label(main, text=f"Receita Total (Top 50): {Formatters.formatar_moeda(total_receita)}", 
+                     font=("Arial", 14, "bold"), fg="#27ae60").pack(pady=(20, 0))
+            
+            tk.Button(main, text="Fechar", font=("Arial", 11), bg="#95a5a6",
+                      fg="white", cursor="hand2", relief=tk.FLAT, padx=30, pady=10,
+                      command=w.destroy).pack(pady=(20, 0))
+        
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao gerar relatório: {str(e)}")
+        finally:
+            cursor.close()
+            conn.close()
     
     def relatorio_estoque_baixo(self):
         """Relatório de estoque baixo."""

@@ -83,7 +83,7 @@ class PixWindow:
         
         tk.Label(
             info_frame,
-            text=f"Chave PIX: {self.pix_service.CHAVE_PIX}",
+            text=f"Chave PIX: {self.pix_service._get_chave_pix()}",
             font=("Arial", 10),
             bg="#ecf0f1",
             fg="#7f8c8d"
@@ -91,7 +91,7 @@ class PixWindow:
         
         tk.Label(
             info_frame,
-            text=f"Beneficiário: {self.pix_service.NOME_BENEFICIARIO}",
+            text=f"Beneficiário: {self.pix_service._get_nome_beneficiario()}",
             font=("Arial", 10),
             bg="#ecf0f1",
             fg="#7f8c8d"

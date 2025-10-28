@@ -203,15 +203,6 @@ def api_pdv_buscar_produtos():
         return jsonify({'erro': str(e)}), 400
 
 
-# ==================== ADMIN - DASHBOARD ====================
-
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    """Dashboard principal."""
-    return render_template('dashboard.html', usuario=session)
-
-
 # ==================== API - PRODUTOS ====================
 
 @app.route('/api/produtos', methods=['GET'])

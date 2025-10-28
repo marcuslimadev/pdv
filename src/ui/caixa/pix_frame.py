@@ -17,19 +17,19 @@ from src.utils.formatters import Formatters
 class PIXFrame(tk.Frame):
     """Frame integrado para pagamento PIX."""
     
-    def __init__(self, parent, valor: Decimal, callback_aprovado, callback_cancelado):
+    def __init__(self, parent, payment_data, callback_aprovado, callback_cancelado):
         super().__init__(parent, bg="#ffffff")
         
-        self.valor = valor
+        self.payment_data = payment_data
+        self.valor = Decimal(str(payment_data.get('transaction_amount', 0)))
         self.callback_aprovado = callback_aprovado
         self.callback_cancelado = callback_cancelado
         
-        self.payment_data = None
         self.payment_id = None
         self.qr_code_data = None
         
         self.criar_widgets()
-        self.iniciar_pagamento_pix()
+        self.processar_payment_data()
     
     def criar_widgets(self):
         """Cria os widgets da interface PIX."""
@@ -82,24 +82,28 @@ class PIXFrame(tk.Frame):
         # Bind do Escape
         self.bind_all('<Escape>', lambda e: self.cancelar_pix())
     
-    def iniciar_pagamento_pix(self):
-        """Inicia o processo de pagamento PIX."""
-        # Cria pagamento no Mercado Pago
-        self.payment_data = mercado_pago_service.criar_pagamento_pix(
-            self.valor, "Venda PDV"
-        )
-        
+    def processar_payment_data(self):
+        """Processa os dados do pagamento já criado."""
         if self.payment_data:
-            self.payment_id = str(self.payment_data["id"])
-            self.qr_code_data = mercado_pago_service.obter_qr_code_pix(self.payment_data)
+            self.payment_id = str(self.payment_data.get("id", ""))
             
-            if self.qr_code_data:
+            # Obter QR Code do payment_data
+            point_of_interaction = self.payment_data.get("point_of_interaction", {})
+            transaction_data = point_of_interaction.get("transaction_data", {})
+            
+            # Estrutura dos dados do QR Code
+            self.qr_code_data = {
+                "qr_code": transaction_data.get("qr_code", ""),
+                "qr_code_base64": transaction_data.get("qr_code_base64", "")
+            }
+            
+            if self.qr_code_data.get("qr_code"):
                 self.mostrar_qr_code()
                 self.iniciar_monitoramento()
             else:
-                self.mostrar_erro("Erro ao gerar QR Code PIX")
+                self.mostrar_erro("Erro ao obter dados do QR Code PIX")
         else:
-            self.mostrar_erro("Erro ao conectar com Mercado Pago")
+            self.mostrar_erro("Erro ao processar pagamento PIX")
     
     def mostrar_qr_code(self):
         """Mostra o QR Code e código Copia e Cola."""

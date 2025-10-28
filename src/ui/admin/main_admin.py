@@ -20,26 +20,36 @@ class MainAdmin:
         self.master = master
         self.usuario = usuario
         
-        # Cria janela principal
-        self.window = tk.Toplevel(master)
-        self.window.title(f"Sistema PDV - Administrador - {usuario.nome_completo}")
-        self.window.geometry("1200x700")
-        self.window.state('zoomed')  # Maximiza a janela
-        
-        # Configuração de fechamento
-        self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
-        
-        # Criar interface
-        self.criar_widgets()
-        
-        # Configurar navegação por teclado
-        self.configurar_navegacao_teclado()
-        
-        # Carrega dashboard inicial
-        self.mostrar_dashboard()
+        try:
+            # Cria janela principal
+            self.window = tk.Toplevel(master)
+            self.window.title(f"Sistema PDV - Administrador - {usuario.nome_completo}")
+            self.window.geometry("1200x700")
+            self.window.state('zoomed')  # Maximiza a janela
+            
+            # Configuração de fechamento
+            self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
+            
+            # Criar interface
+            self.criar_widgets()
+            
+            # Configurar navegação por teclado
+            self.configurar_navegacao_teclado()
+            
+            # Carrega dashboard inicial
+            self.mostrar_dashboard()
+            
+        except Exception as e:
+            print(f"ERRO ao criar MainAdmin: {e}")
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror("Erro", f"Erro ao criar painel administrativo:\n{str(e)}")
     
     def criar_widgets(self):
         """Cria os widgets da interface."""
+        # Inicializa lista para navegação pelos botões do menu
+        self.botoes_menu = []
+        
         # Container principal
         container = ttk.Frame(self.window)
         container.pack(fill=tk.BOTH, expand=True)
@@ -50,9 +60,6 @@ class MainAdmin:
         # Área de trabalho
         self.area_trabalho = ttk.Frame(container, relief=tk.FLAT)
         self.area_trabalho.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # Lista para navegação pelos botões do menu
-        self.botoes_menu = []
     
     def criar_menu_lateral(self, parent):
         """Cria o menu lateral."""

@@ -33,46 +33,57 @@ class VendaFrame(ttk.Frame):
         
         self.criar_widgets()
         self.configurar_atalhos()
+        
+        # Reconfigura atalhos quando a janela recebe foco
+        self.bind('<FocusIn>', lambda e: self.after(50, self._reconfigurar_se_necessario))
+        
         self.entry_codigo.focus()
     
+    def _reconfigurar_se_necessario(self):
+        """Reconfigura atalhos se necessário (após janelas modais)."""
+        if self.winfo_exists():
+            self.configurar_atalhos()
+            self.entry_codigo.focus_set()
+    
     def configurar_atalhos(self):
-        """Configura atalhos F1-F10 e navegação completa por teclado."""
+        """Configura atalhos de teclado de forma organizada e sem duplicações."""
         self._limpar_atalhos_principais()
-        # Atalhos de função
-        self.bind_all('<F1>', lambda e: self.buscar_produto())
-        self.bind_all('<F2>', lambda e: self.adicionar_produto_por_codigo())
-        self.bind_all('<F3>', lambda e: self.solicitar_quantidade())
-        self.bind_all('<F4>', lambda e: self.aplicar_desconto())
-        self.bind_all('<F5>', lambda e: self.remover_item_selecionado())
-        self.bind_all('<F6>', lambda e: self.cancelar_venda())
-        self.bind_all('<F9>', lambda e: self.callback_fechar_caixa())
-        self.bind_all('<F10>', lambda e: self.finalizar_venda())
         
-        # Navegação e operações
+        # ===== ATALHOS PRINCIPAIS DE VENDA =====
+        # F1-F2: Operações básicas
+        self.bind_all('<F1>', lambda e: self.buscar_produto())              # Buscar produto
+        self.bind_all('<F2>', lambda e: self.adicionar_produto_por_codigo()) # Adicionar por código
+        
+        # F5-F6: Remoção e cancelamento
+        self.bind_all('<F5>', lambda e: self.remover_item_selecionado())    # Remover item
+        self.bind_all('<F6>', lambda e: self.cancelar_venda())              # Cancelar venda
+        
+        # F7-F8: Operações com autenticação admin
+        self.bind_all('<F7>', lambda e: self.editar_quantidade_com_admin()) # Editar com admin
+        self.bind_all('<F8>', lambda e: self.cancelar_item_com_admin())     # Cancelar com admin
+        
+        # F9-F10: Finalização
+        self.bind_all('<F9>', lambda e: self.callback_fechar_caixa())       # Fechar caixa
+        self.bind_all('<F10>', lambda e: self.finalizar_venda())            # Finalizar venda
+        
+        # ===== ATALHOS COM CTRL (ALTERNATIVOS) =====
+        self.bind_all('<Control-n>', lambda e: self.venda_service.iniciar_nova_venda(self.usuario.id, self.caixa.id))
+        self.bind_all('<Control-f>', lambda e: self.buscar_produto())
+        self.bind_all('<Control-Return>', lambda e: self.finalizar_venda())
+        
+        # ===== NAVEGAÇÃO =====
         self.bind_all('<Delete>', lambda e: self.remover_item_selecionado())
         self.bind_all('<Escape>', lambda e: self.limpar_campo_codigo())
         self.bind_all('<Tab>', self._navegar_proximo)
         self.bind_all('<Shift-Tab>', self._navegar_anterior)
         
-        # Navegação na lista de produtos com setas
+        # Navegação na lista
         self.bind_all('<Up>', self._navegar_lista_cima)
         self.bind_all('<Down>', self._navegar_lista_baixo)
         self.bind_all('<Home>', self._ir_primeiro_item)
         self.bind_all('<End>', self._ir_ultimo_item)
         self.bind_all('<Page_Up>', self._pagina_cima)
         self.bind_all('<Page_Down>', self._pagina_baixo)
-        
-        # Atalhos avançados
-        self.bind_all('<Control-n>', lambda e: self.venda_service.iniciar_nova_venda(self.usuario.id, self.caixa.id))
-        self.bind_all('<Control-f>', lambda e: self.buscar_produto())
-        self.bind_all('<Control-d>', lambda e: self.aplicar_desconto())
-        
-        # Enter alternativo para finalizar
-        self.bind_all('<Control-Return>', lambda e: self.finalizar_venda())
-        
-        # Atalhos para operações especiais com admin
-        self.bind_all('<F7>', lambda e: self.editar_quantidade_com_admin())
-        self.bind_all('<F8>', lambda e: self.cancelar_item_com_admin())
     
     def criar_widgets(self):
         """Cria interface."""
@@ -122,16 +133,16 @@ class VendaFrame(ttk.Frame):
             self.unbind_all(atalho)
     
     def criar_barra_atalhos(self, parent):
-        """Barra com teclas F1-F10."""
+        """Barra com atalhos principais do sistema."""
         barra = tk.Frame(parent, bg="#2c3e50", height=45)
         barra.pack(fill=tk.X)
         
         atalhos = [
-            ("F1", "Buscar", "#3498db"), ("F2", "Por Código", "#16a085"),
-            ("F3", "Quantidade", "#f39c12"), ("F4", "Desconto", "#9b59b6"), 
-            ("F5", "Cancelar Item", "#e67e22"), ("F6", "Cancelar Venda", "#e74c3c"), 
-            ("F7", "Edit. Qtd (ADM)", "#f39c12"), ("F8", "Cancel. Item (ADM)", "#e74c3c"), 
-            ("F9", "Fechar Caixa", "#95a5a6"), ("F10", "FINALIZAR", "#27ae60"),
+            ("F1", "Buscar", "#3498db"), 
+            ("F2", "Código", "#16a085"),
+            ("F5", "Remover", "#e67e22"), 
+            ("F6", "Cancelar", "#e74c3c"),
+            ("F10", "FINALIZAR", "#27ae60"),
         ]
         
         for tecla, texto, cor in atalhos:
@@ -364,9 +375,18 @@ class VendaFrame(ttk.Frame):
             self.label_total.config(text=Formatters.formatar_moeda(venda.total))
     
     def buscar_produto(self, termo=""):
-        """Abre busca."""
+        """Abre busca e reconfigura atalhos após fechar."""
         from src.ui.caixa.busca_produto_window import BuscaProdutoWindow
-        BuscaProdutoWindow(self, termo or self.entry_codigo.get(), self.adicionar_produto_busca)
+        
+        # Salva callback original e modifica para reconfigurar após
+        callback_original = self.adicionar_produto_busca
+        
+        def callback_wrapper(produto):
+            callback_original(produto)
+            # Agenda reconfiguração após callback
+            self.after(100, self._reconfigurar_se_necessario)
+        
+        BuscaProdutoWindow(self, termo or self.entry_codigo.get(), callback_wrapper)
     
     def adicionar_produto_busca(self, produto):
         """Adiciona produto da busca."""
@@ -379,78 +399,34 @@ class VendaFrame(ttk.Frame):
             self.label_ultimo_produto.config(text=f"{produto.nome}\n{qtd} x {Formatters.formatar_moeda(produto.preco_venda)}")
             self.label_ultimo_valor.config(text=Formatters.formatar_moeda(qtd * produto.preco_venda))
             self.entry_codigo.delete(0, tk.END)
-            self.entry_codigo.focus()
             self.mostrar_mensagem_temporaria(f"✅ {produto.nome} adicionado", "#27ae60")
+            
+            # Força retorno do foco após adicionar
+            self.after(100, lambda: self.entry_codigo.focus_set())
         else:
             self.mostrar_mensagem_temporaria(f"❌ {msg}", "#e74c3c")
     
     def solicitar_quantidade(self):
-        """F3 - Solicita quantidade."""
-        d = tk.Toplevel(self)
-        d.title("Quantidade")
-        d.geometry("300x150")
-        d.transient(self)
-        d.grab_set()
-        
-        f = ttk.Frame(d, padding="20")
-        f.pack(fill=tk.BOTH, expand=True)
-        
-        tk.Label(f, text="Digite a Quantidade:", font=("Arial", 12)).pack(pady=(0, 10))
-        
-        e = ttk.Entry(f, font=("Arial", 14), width=15)
-        e.pack(pady=(0, 20))
-        e.focus()
-        
-        def ok():
-            if e.get().strip():
-                self.quantidade_digitada = e.get().strip()
-                self.label_quantidade.config(text=f"Qtd: {self.quantidade_digitada} X")
-            d.destroy()
-            self.entry_codigo.focus()
-        
-        tk.Button(f, text="Confirmar", font=("Arial", 11, "bold"), bg="#27ae60", fg="white",
-                  cursor="hand2", relief=tk.FLAT, padx=30, pady=10, command=ok).pack()
-        e.bind('<Return>', lambda ev: ok())
+        """F3 - Solicita quantidade inline (sem popup)."""
+        # Remove o popup - agora o usuário digita direto antes do código
+        # Exemplo: digitar "3" + código de barras = adiciona 3 unidades
+        self.mostrar_mensagem_temporaria("💡 Digite a quantidade + código de barras", "#3498db")
+        self.entry_codigo.focus()
     
     def solicitar_quantidade_para_produto(self, produto):
-        """Solicita quantidade para produto específico."""
-        d = tk.Toplevel(self)
-        d.title("Quantidade")
-        d.geometry("350x200")
-        d.transient(self)
-        d.grab_set()
-        
-        f = ttk.Frame(d, padding="20")
-        f.pack(fill=tk.BOTH, expand=True)
-        
-        tk.Label(f, text=produto.nome, font=("Arial", 12, "bold")).pack(pady=(0, 10))
-        tk.Label(f, text="Digite a Quantidade:", font=("Arial", 11)).pack(pady=(0, 10))
-        
-        e = ttk.Entry(f, font=("Arial", 14), width=15)
-        e.pack(pady=(0, 20))
-        e.insert(0, "1")
-        e.select_range(0, tk.END)
-        e.focus()
-        
-        def ok():
-            try:
-                qtd = Decimal(e.get().replace(',', '.'))
-                sucesso, msg = self.venda_service.adicionar_produto(produto, qtd)
-                if sucesso:
-                    self.atualizar_lista_produtos()
-                    self.label_ultimo_produto.config(text=f"{produto.nome}\n{qtd} x {Formatters.formatar_moeda(produto.preco_venda)}")
-                    self.label_ultimo_valor.config(text=Formatters.formatar_moeda(qtd * produto.preco_venda))
-                    d.destroy()
-                    self.entry_codigo.delete(0, tk.END)
-                    self.entry_codigo.focus()
-                else:
-                    messagebox.showerror("Erro", msg)
-            except:
-                messagebox.showerror("Erro", "Quantidade inválida!")
-        
-        tk.Button(f, text="Confirmar", font=("Arial", 11, "bold"), bg="#27ae60", fg="white",
-                  cursor="hand2", relief=tk.FLAT, padx=30, pady=10, command=ok).pack()
-        e.bind('<Return>', lambda ev: ok())
+        """Adiciona produto com quantidade padrão 1 (sem popup)."""
+        from decimal import Decimal
+        qtd = Decimal("1")
+        sucesso, msg = self.venda_service.adicionar_produto(produto, qtd)
+        if sucesso:
+            self.atualizar_lista_produtos()
+            self.label_ultimo_produto.config(text=f"{produto.nome}\n{qtd} x {Formatters.formatar_moeda(produto.preco_venda)}")
+            self.label_ultimo_valor.config(text=Formatters.formatar_moeda(qtd * produto.preco_venda))
+            self.entry_codigo.delete(0, tk.END)
+            self.entry_codigo.focus()
+            self.mostrar_mensagem_temporaria(f"✅ {produto.nome} adicionado", "#27ae60")
+        else:
+            self.mostrar_mensagem_temporaria(f"❌ {msg}", "#e74c3c")
     
     def remover_item_selecionado(self):
         """F5 - Remove item."""
@@ -470,41 +446,9 @@ class VendaFrame(ttk.Frame):
         self.entry_codigo.focus()
     
     def aplicar_desconto(self):
-        """F4 - Aplica desconto."""
-        d = tk.Toplevel(self)
-        d.title("Desconto")
-        d.geometry("350x180")
-        d.transient(self)
-        d.grab_set()
-        
-        f = ttk.Frame(d, padding="20")
-        f.pack(fill=tk.BOTH, expand=True)
-        
-        tk.Label(f, text="💰 Desconto", font=("Arial", 16, "bold"), fg="#e74c3c").pack(pady=(0, 15))
-        tk.Label(f, text="Valor do Desconto:", font=("Arial", 11)).pack(pady=(0, 10))
-        
-        e = ttk.Entry(f, font=("Arial", 14), width=15)
-        e.pack(pady=(0, 20))
-        e.insert(0, "0.00")
-        e.select_range(0, tk.END)
-        e.focus()
-        
-        def ok():
-            try:
-                desc = Decimal(e.get().replace(',', '.'))
-                sucesso, msg = self.venda_service.aplicar_desconto(desc)
-                if sucesso:
-                    self.atualizar_totais()
-                    d.destroy()
-                    self.entry_codigo.focus()
-                else:
-                    messagebox.showerror("Erro", msg)
-            except:
-                messagebox.showerror("Erro", "Valor inválido!")
-        
-        tk.Button(f, text="Confirmar", font=("Arial", 11, "bold"), bg="#e74c3c", fg="white",
-                  cursor="hand2", relief=tk.FLAT, padx=30, pady=10, command=ok).pack()
-        e.bind('<Return>', lambda ev: ok())
+        """F4 - Desabilitado (sem popup de desconto)."""
+        self.mostrar_mensagem_temporaria("⚠️ Função de desconto desabilitada", "#f39c12")
+        self.entry_codigo.focus()
     
     def cancelar_venda(self):
         """F6 - Cancela venda."""
@@ -642,11 +586,13 @@ class VendaFrame(ttk.Frame):
         """Configura navegação por teclado na área de pagamento."""
         self._limpar_atalhos_principais()
         
-        # Novos bindings para pagamento
+        # ===== ATALHOS DE PAGAMENTO =====
         self.bind_all('<F1>', lambda e: self.processar_pagamento("dinheiro"))
         self.bind_all('<F2>', lambda e: self.processar_pagamento("debito"))
         self.bind_all('<F3>', lambda e: self.processar_pagamento("credito"))
         self.bind_all('<F4>', lambda e: self.processar_pagamento("pix"))
+        
+        # Navegação
         self.bind_all('<Escape>', lambda e: self.voltar_para_venda())
         self.bind_all('<F9>', lambda e: self.cancelar_venda())
         
@@ -772,7 +718,7 @@ class VendaFrame(ttk.Frame):
             # Criar pagamento PIX
             payment_data = mp_service.criar_pagamento_pix(
                 valor=float(venda.total),
-                descricao=f"Venda PDV #{venda.numero}"
+                descricao=f"Venda PDV #{venda.numero_venda}"
             )
             
             if payment_data:
@@ -861,23 +807,23 @@ class VendaFrame(ttk.Frame):
         botoes_frame = tk.Frame(content_frame, bg="#ffffff")
         botoes_frame.pack(fill=tk.X)
         
-        btn_sim = tk.Button(botoes_frame, text="F1 - SIM", font=("Arial", 14, "bold"),
+        btn_sim = tk.Button(botoes_frame, text="ENTER - SIM", font=("Arial", 14, "bold"),
                            bg="#27ae60", fg="white", relief=tk.FLAT, pady=15,
                            command=self.imprimir_cupom)
         btn_sim.pack(fill=tk.X, pady=(0, 10))
         
-        btn_nao = tk.Button(botoes_frame, text="F2 - NÃO", font=("Arial", 14, "bold"),
+        btn_nao = tk.Button(botoes_frame, text="ESC - NÃO", font=("Arial", 14, "bold"),
                            bg="#95a5a6", fg="white", relief=tk.FLAT, pady=15,
                            command=self.nova_venda)
         btn_nao.pack(fill=tk.X)
         
         # Status
-        tk.Label(content_frame, text="⌨️ F1 = Imprimir | F2 = Próxima venda", font=("Arial", 10),
+        tk.Label(content_frame, text="⌨️ ENTER = Imprimir | ESC = Próxima venda", font=("Arial", 10),
                  bg="#ffffff", fg="#7f8c8d").pack(pady=(20, 0))
         
         # Configurar navegação
-        self.bind_all('<F1>', lambda e: self.imprimir_cupom())
-        self.bind_all('<F2>', lambda e: self.nova_venda())
+        self.bind_all('<Return>', lambda e: self.imprimir_cupom())
+        self.bind_all('<Escape>', lambda e: self.nova_venda())
         
         # Auto-foco no primeiro botão
         btn_sim.focus_set()
