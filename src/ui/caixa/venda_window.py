@@ -41,9 +41,13 @@ class VendaFrame(ttk.Frame):
     
     def _reconfigurar_se_necessario(self):
         """Reconfigura atalhos se necessário (após janelas modais)."""
-        if self.winfo_exists():
-            self.configurar_atalhos()
-            self.entry_codigo.focus_set()
+        if self.winfo_exists() and hasattr(self, 'entry_codigo'):
+            try:
+                if self.entry_codigo.winfo_exists():
+                    self.configurar_atalhos()
+                    self.entry_codigo.focus_set()
+            except:
+                pass  # Ignora erros se widget foi destruído
     
     def configurar_atalhos(self):
         """Configura atalhos de teclado de forma organizada e sem duplicações."""
@@ -118,8 +122,24 @@ class VendaFrame(ttk.Frame):
 
     def _montar_area_venda_esquerda(self):
         """Monta components principais da área de venda."""
-        self.criar_campo_entrada(self.painel_esquerdo)
-        self.criar_lista_produtos(self.painel_esquerdo)
+        # Container para alternar entre venda e busca
+        self.container_esquerdo = tk.Frame(self.painel_esquerdo, bg="#ecf0f1")
+        self.container_esquerdo.pack(fill=tk.BOTH, expand=True)
+        
+        # Frame de venda (padrão)
+        self.frame_venda = tk.Frame(self.container_esquerdo, bg="#ecf0f1")
+        self.frame_venda.pack(fill=tk.BOTH, expand=True)
+        
+        self.criar_campo_entrada(self.frame_venda)
+        self.criar_lista_produtos(self.frame_venda)
+        
+        # Painel de busca (inline, oculto inicialmente)
+        from src.ui.caixa.busca_produto_panel import BuscaProdutoPanel
+        self.painel_busca = BuscaProdutoPanel(
+            self.container_esquerdo,
+            callback=self.adicionar_produto_busca_inline
+        )
+        # Não mostra inicialmente (pack_forget já é o padrão)
 
     def _limpar_atalhos_principais(self):
         """Remove bindings globais para evitar duplicidade."""
@@ -375,22 +395,27 @@ class VendaFrame(ttk.Frame):
             self.label_total.config(text=Formatters.formatar_moeda(venda.total))
     
     def buscar_produto(self, termo=""):
-        """Abre busca e reconfigura atalhos após fechar."""
-        from src.ui.caixa.busca_produto_window import BuscaProdutoWindow
-        
-        # Salva callback original e modifica para reconfigurar após
-        callback_original = self.adicionar_produto_busca
-        
-        def callback_wrapper(produto):
-            callback_original(produto)
-            # Agenda reconfiguração após callback
-            self.after(100, self._reconfigurar_se_necessario)
-        
-        BuscaProdutoWindow(self, termo or self.entry_codigo.get(), callback_wrapper)
+        """Toggle do painel de busca inline."""
+        # Se painel já está visível, oculta
+        if self.painel_busca.winfo_ismapped():
+            self.painel_busca.ocultar()
+            self.frame_venda.pack(fill=tk.BOTH, expand=True)
+            self.entry_codigo.focus_set()
+        else:
+            # Oculta área de venda e mostra painel de busca
+            self.frame_venda.pack_forget()
+            termo_busca = termo or self.entry_codigo.get()
+            self.painel_busca.mostrar(termo_busca)
     
-    def adicionar_produto_busca(self, produto):
-        """Adiciona produto da busca."""
-        # Adiciona com quantidade 1 por padrão
+    def adicionar_produto_busca_inline(self, produto):
+        """Callback quando produto é selecionado no painel inline."""
+        if produto is None:
+            # Cancelou a busca - volta para venda
+            self.frame_venda.pack(fill=tk.BOTH, expand=True)
+            self.entry_codigo.focus_set()
+            return
+        
+        # Adiciona produto
         from decimal import Decimal
         qtd = Decimal("1")
         sucesso, msg = self.venda_service.adicionar_produto(produto, qtd)
@@ -400,11 +425,16 @@ class VendaFrame(ttk.Frame):
             self.label_ultimo_valor.config(text=Formatters.formatar_moeda(qtd * produto.preco_venda))
             self.entry_codigo.delete(0, tk.END)
             self.mostrar_mensagem_temporaria(f"✅ {produto.nome} adicionado", "#27ae60")
-            
-            # Força retorno do foco após adicionar
-            self.after(100, lambda: self.entry_codigo.focus_set())
         else:
             self.mostrar_mensagem_temporaria(f"❌ {msg}", "#e74c3c")
+        
+        # Volta para área de venda
+        self.frame_venda.pack(fill=tk.BOTH, expand=True)
+        self.entry_codigo.focus_set()
+    
+    def adicionar_produto_busca(self, produto):
+        """Método legado - redireciona para inline."""
+        self.adicionar_produto_busca_inline(produto)
     
     def solicitar_quantidade(self):
         """F3 - Solicita quantidade inline (sem popup)."""
@@ -464,10 +494,10 @@ class VendaFrame(ttk.Frame):
     
     def finalizar_venda(self):
         """F10 - Finaliza venda."""
-        # Fechar janela de busca se estiver aberta
-        for child in self.winfo_children():
-            if isinstance(child, tk.Toplevel) and "Buscar" in child.title():
-                child.destroy()
+        # Se painel de busca está aberto, fecha
+        if self.painel_busca.winfo_ismapped():
+            self.painel_busca.ocultar()
+            self.frame_venda.pack(fill=tk.BOTH, expand=True)
         
         venda = self.venda_service.get_venda_atual()
         if not venda or len(venda.itens) == 0:
@@ -488,9 +518,8 @@ class VendaFrame(ttk.Frame):
     
     def mostrar_area_pagamento(self):
         """Mostra área de pagamento integrada na própria tela."""
-        # Esconde o painel de entrada
-        for widget in self.painel_esquerdo.winfo_children():
-            widget.destroy()
+        # Esconde o container de venda (mas não destrói)
+        self.container_esquerdo.pack_forget()
         
         # Criar área de pagamento no painel esquerdo
         self.criar_area_pagamento_integrada()
@@ -502,11 +531,11 @@ class VendaFrame(ttk.Frame):
     def criar_area_pagamento_integrada(self):
         """Cria área de pagamento integrada."""
         # Frame principal do pagamento
-        frame_pagamento = tk.Frame(self.painel_esquerdo, bg="#ffffff", relief=tk.RAISED, bd=3)
-        frame_pagamento.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.frame_pagamento = tk.Frame(self.painel_esquerdo, bg="#ffffff", relief=tk.RAISED, bd=3)
+        self.frame_pagamento.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # Título
-        titulo_frame = tk.Frame(frame_pagamento, bg="#27ae60", height=50)
+        titulo_frame = tk.Frame(self.frame_pagamento, bg="#27ae60", height=50)
         titulo_frame.pack(fill=tk.X)
         titulo_frame.pack_propagate(False)
         
@@ -514,7 +543,7 @@ class VendaFrame(ttk.Frame):
                  bg="#27ae60", fg="white").pack(expand=True)
         
         # Valor total
-        total_frame = tk.Frame(frame_pagamento, bg="#ecf0f1", relief=tk.RAISED, bd=2)
+        total_frame = tk.Frame(self.frame_pagamento, bg="#ecf0f1", relief=tk.RAISED, bd=2)
         total_frame.pack(fill=tk.X, padx=15, pady=15)
         
         tk.Label(total_frame, text="TOTAL A PAGAR", font=("Arial", 12, "bold"),
@@ -525,7 +554,7 @@ class VendaFrame(ttk.Frame):
                  bg="#ecf0f1", fg="#27ae60").pack(pady=(0, 10))
         
         # Opções de pagamento
-        opcoes_frame = tk.Frame(frame_pagamento, bg="#ffffff")
+        opcoes_frame = tk.Frame(self.frame_pagamento, bg="#ffffff")
         opcoes_frame.pack(fill=tk.X, padx=15, pady=15)
         
         tk.Label(opcoes_frame, text="ESCOLHA A FORMA DE PAGAMENTO:", font=("Arial", 12, "bold"),
@@ -563,12 +592,12 @@ class VendaFrame(ttk.Frame):
         self.opcoes_pagamento.append(btn_pix)
         
         # Status do pagamento
-        self.status_pagamento = tk.Label(frame_pagamento, text="⌨️ Use F1-F4 para escolher | ↑↓ para navegar | ESC para voltar",
+        self.status_pagamento = tk.Label(self.frame_pagamento, text="⌨️ Use F1-F4 para escolher | ↑↓ para navegar | ESC para voltar",
                                         font=("Arial", 10), bg="#ffffff", fg="#7f8c8d")
         self.status_pagamento.pack(pady=10)
         
         # Botões de ação
-        acoes_frame = tk.Frame(frame_pagamento, bg="#ffffff")
+        acoes_frame = tk.Frame(self.frame_pagamento, bg="#ffffff")
         acoes_frame.pack(fill=tk.X, padx=15, pady=15)
         
         tk.Button(acoes_frame, text="ESC - VOLTAR", font=("Arial", 12, "bold"),
@@ -732,9 +761,9 @@ class VendaFrame(ttk.Frame):
     
     def mostrar_pix_interface(self, payment_data, venda):
         """Mostra interface PIX integrada."""
-        # Limpar área de pagamento
-        for widget in self.painel_esquerdo.winfo_children():
-            widget.destroy()
+        # Ocultar frame de pagamento
+        if hasattr(self, 'frame_pagamento'):
+            self.frame_pagamento.pack_forget()
         
         # Criar frame PIX
         try:
@@ -746,10 +775,12 @@ class VendaFrame(ttk.Frame):
                 callback_aprovado=lambda: self.pix_aprovado(venda),
                 callback_cancelado=self.voltar_para_venda
             )
-            self.pix_frame.pack(fill=tk.BOTH, expand=True)
+            self.pix_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
             
         except Exception as e:
             print(f"Erro ao criar PIX frame: {e}")
+            import traceback
+            traceback.print_exc()
             self.voltar_para_venda()
     
     def pix_aprovado(self, venda):
@@ -840,16 +871,19 @@ class VendaFrame(ttk.Frame):
     
     def voltar_para_venda(self):
         """Volta para a tela de venda."""
-        # Limpar área de pagamento/pix/cupom
-        for widget in self.painel_esquerdo.winfo_children():
-            widget.destroy()
+        # Destruir frames de pagamento ou PIX se existirem
+        if hasattr(self, 'frame_pagamento') and self.frame_pagamento.winfo_exists():
+            self.frame_pagamento.destroy()
+        if hasattr(self, 'pix_frame') and self.pix_frame.winfo_exists():
+            self.pix_frame.destroy()
         
-        # Recriar widgets originais
-        self._montar_area_venda_esquerda()
-
-        for widget in self.painel_direito_container.winfo_children():
-            widget.destroy()
-        self.criar_painel_direito()
+        # Mostrar container de venda novamente
+        self.container_esquerdo.pack(fill=tk.BOTH, expand=True)
+        
+        # Garantir que o frame de venda está visível
+        if self.painel_busca.winfo_ismapped():
+            self.painel_busca.ocultar()
+        self.frame_venda.pack(fill=tk.BOTH, expand=True)
         
         # Restaurar bindings originais
         self.configurar_atalhos()

@@ -64,7 +64,7 @@ class MercadoPagoService:
                     "email": "cliente@exemplo.com"  # Email genérico para PDV
                 },
                 "notification_url": self.webhook_url,
-                "date_of_expiration": (datetime.now() + timedelta(minutes=15)).isoformat(),
+                "date_of_expiration": (datetime.now() + timedelta(minutes=15)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
                 "external_reference": f"PDV_{int(time.time())}",  # Referência única
                 "application_fee": float(application_fee),
                 "metadata": {
