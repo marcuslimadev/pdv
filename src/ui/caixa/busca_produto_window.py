@@ -56,7 +56,6 @@ class BuscaProdutoWindow:
         
         self.entry_busca = ttk.Entry(busca_frame, font=("Arial", 12))
         self.entry_busca.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-        self.entry_busca.bind('<Return>', lambda e: self.buscar())
         
         tk.Button(
             busca_frame,
@@ -99,10 +98,9 @@ class BuscaProdutoWindow:
         
         # Navegação por teclado
         self.tree.bind('<Double-1>', lambda e: self.selecionar())
-        self.tree.bind('<Return>', lambda e: self.selecionar())
         self.tree.bind('<Up>', self._navegar_cima)
         self.tree.bind('<Down>', self._navegar_baixo)
-        self.tree.bind('<space>', lambda e: self.selecionar())  # Espaço também seleciona
+        self.tree.bind('<space>', self._selecionar_space)
         
         # Atalhos globais
         self.window.bind('<Escape>', lambda e: self.window.destroy())
@@ -220,42 +218,50 @@ class BuscaProdutoWindow:
                 self.tree.selection_set(children[0])
                 self.tree.see(children[0])
         return "break"
+
+    def _selecionar_space(self, event):
+        """Seleciona item ao pressionar espaço e interrompe propagação."""
+        self.selecionar()
+        return "break"
     
     def _handle_enter(self, event):
         """Trata Enter baseado no foco atual."""
         focused = self.window.focus_get()
-        focused_class = focused.__class__.__name__ if focused else "None"
+        focused_class = focused.__class__.__name__ if focused else ""
         
-        print(f"Enter pressionado, foco em: {focused} (classe: {focused_class})")
-        
-        # Se está no campo de busca, executa busca
+        # Se está no campo de busca, executa busca e prepara navegação na lista
         if focused == self.entry_busca:
-            print("Foco no campo de busca - executando busca")
             self.buscar()
+            children = self.tree.get_children()
+            if children:
+                self.tree.focus_set()
+                self.tree.selection_set(children[0])
+                self.tree.focus(children[0])
+                self.tree.see(children[0])
             return "break"
         
         # Se está na árvore (lista), seleciona produto
         if focused_class == 'Treeview' or focused == self.tree:
-            print("Foco na lista - selecionando produto")
             self.selecionar()
             return "break"
         
-        # Se não conseguir identificar, verifica se há seleção na tree
+        # Se há item selecionado, confirma seleção
         selecionado = self.tree.selection()
         if selecionado:
-            print("Há item selecionado na lista - selecionando produto")
             self.selecionar()
-        else:
-            print("Nenhum contexto claro - tentando buscar")
-            self.buscar()
+            return "break"
         
+        # Sem contexto claro: executa busca novamente
+        self.buscar()
+        children = self.tree.get_children()
+        if children:
+            self.tree.focus_set()
         return "break"
     
     def selecionar(self):
         """Seleciona o produto."""
         children = self.tree.get_children()
         if not children:
-            print("Nenhum produto na lista")
             return
         
         selecionado = self.tree.selection()
@@ -271,13 +277,10 @@ class BuscaProdutoWindow:
                 produto_id = int(self.tree.item(selecionado[0])['tags'][0])
                 produto = ProdutoDAO.buscar_por_id(produto_id)
                 
-                print(f"Produto selecionado: {produto.nome if produto else 'Não encontrado'}")
-                
                 if produto and self.callback:
                     self.callback(produto)
                 
                 self.window.destroy()
             except Exception as e:
-                print(f"Erro ao selecionar produto: {e}")
-        else:
-            print("Não foi possível selecionar produto")
+                # Falha silenciosa: mantém janela aberta para nova tentativa
+                pass

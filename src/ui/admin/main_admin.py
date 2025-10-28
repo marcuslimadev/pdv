@@ -277,17 +277,9 @@ class MainAdmin:
     def mostrar_configuracoes(self):
         """Mostra a tela de configurações."""
         self.limpar_area_trabalho()
-        tk.Label(
-            self.area_trabalho,
-            text="⚙️ Configurações",
-            font=("Arial", 24, "bold")
-        ).pack(pady=50)
-        tk.Label(
-            self.area_trabalho,
-            text="Módulo em desenvolvimento",
-            font=("Arial", 14),
-            fg="#7f8c8d"
-        ).pack()
+        from src.ui.admin.configuracoes_window import ConfiguracoesFrame
+
+        ConfiguracoesFrame(self.area_trabalho).pack(fill=tk.BOTH, expand=True)
     
     def sair(self):
         """Sai do sistema."""

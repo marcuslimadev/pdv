@@ -37,6 +37,7 @@ class VendaFrame(ttk.Frame):
     
     def configurar_atalhos(self):
         """Configura atalhos F1-F10 e navegação completa por teclado."""
+        self._limpar_atalhos_principais()
         # Atalhos de função
         self.bind_all('<F1>', lambda e: self.buscar_produto())
         self.bind_all('<F2>', lambda e: self.adicionar_produto_por_codigo())
@@ -70,43 +71,58 @@ class VendaFrame(ttk.Frame):
         self.bind_all('<Control-Return>', lambda e: self.finalizar_venda())
         
         # Atalhos para operações especiais com admin
-        self.bind_all('<F8>', lambda e: self.cancelar_item_com_admin())
         self.bind_all('<F7>', lambda e: self.editar_quantidade_com_admin())
+        self.bind_all('<F8>', lambda e: self.cancelar_item_com_admin())
     
     def criar_widgets(self):
         """Cria interface."""
-        main = tk.Frame(self, bg="#ecf0f1")
-        main.pack(fill=tk.BOTH, expand=True)
+        self.main_frame = tk.Frame(self, bg="#ecf0f1")
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Barra de atalhos
-        self.criar_barra_atalhos(main)
+        self.criar_barra_atalhos(self.main_frame)
         
         # Info operador
-        info = tk.Frame(main, bg="#34495e", height=40)
+        info = tk.Frame(self.main_frame, bg="#34495e", height=40)
         info.pack(fill=tk.X)
         tk.Label(info, text=f"👤 {self.usuario.nome_completo}  |  💵 Caixa #{self.caixa.id}",
                  font=("Arial", 11, "bold"), fg="white", bg="#34495e").pack(pady=10)
         
-        # Campo código GRANDE
-        self.criar_campo_entrada(main)
+        # Área principal (esquerda e direita)
+        corpo = tk.Frame(self.main_frame, bg="#ecf0f1")
+        corpo.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Conteúdo
-        content = ttk.Frame(main)
-        content.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # Painel esquerdo (campo código + lista)
+        self.painel_esquerdo = tk.Frame(corpo, bg="#ecf0f1")
+        self.painel_esquerdo.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self._montar_area_venda_esquerda()
         
-        self.criar_lista_produtos(content)
-        
-        # Container para painel direito (total/pagamento)
-        self.painel_direito_container = tk.Frame(content)
+        # Container para painel direito (totais / pagamento)
+        self.painel_direito_container = tk.Frame(corpo)
         self.painel_direito_container.pack(side=tk.RIGHT, fill=tk.Y)
-        
         self.criar_painel_direito()
         
         # Estado da tela
         self.modo_pagamento = False
+
+    def _montar_area_venda_esquerda(self):
+        """Monta components principais da área de venda."""
+        self.criar_campo_entrada(self.painel_esquerdo)
+        self.criar_lista_produtos(self.painel_esquerdo)
+
+    def _limpar_atalhos_principais(self):
+        """Remove bindings globais para evitar duplicidade."""
+        atalhos = [
+            '<F1>', '<F2>', '<F3>', '<F4>', '<F5>', '<F6>', '<F7>', '<F8>', '<F9>', '<F10>',
+            '<Delete>', '<Escape>', '<Tab>', '<Shift-Tab>',
+            '<Up>', '<Down>', '<Home>', '<End>', '<Page_Up>', '<Page_Down>',
+            '<Control-n>', '<Control-f>', '<Control-d>', '<Control-Return>'
+        ]
+        for atalho in atalhos:
+            self.unbind_all(atalho)
     
     def criar_barra_atalhos(self, parent):
-        """Barra com teclas F2-F10."""
+        """Barra com teclas F1-F10."""
         barra = tk.Frame(parent, bg="#2c3e50", height=45)
         barra.pack(fill=tk.X)
         
@@ -160,7 +176,7 @@ class VendaFrame(ttk.Frame):
     def criar_lista_produtos(self, parent):
         """Lista de produtos."""
         frame = tk.Frame(parent, bg="white", relief=tk.RAISED, bd=2)
-        frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        frame.pack(fill=tk.BOTH, expand=True, padx=(0, 10))
         
         titulo = tk.Frame(frame, bg="#3498db", height=40)
         titulo.pack(fill=tk.X)
@@ -530,14 +546,14 @@ class VendaFrame(ttk.Frame):
         """Mostra área de pagamento integrada na própria tela."""
         # Esconde o painel de entrada
         for widget in self.painel_esquerdo.winfo_children():
-            if hasattr(widget, 'pack_info'):
-                widget.pack_forget()
+            widget.destroy()
         
         # Criar área de pagamento no painel esquerdo
         self.criar_area_pagamento_integrada()
         
         # Foco na primeira opção de pagamento
         self.opcoes_pagamento[0].focus_set()
+        self.modo_pagamento = True
     
     def criar_area_pagamento_integrada(self):
         """Cria área de pagamento integrada."""
@@ -624,11 +640,7 @@ class VendaFrame(ttk.Frame):
     
     def configurar_navegacao_pagamento(self):
         """Configura navegação por teclado na área de pagamento."""
-        # Remover bindings anteriores
-        self.unbind_all('<F1>')
-        self.unbind_all('<F2>')
-        self.unbind_all('<F3>')
-        self.unbind_all('<F4>')
+        self._limpar_atalhos_principais()
         
         # Novos bindings para pagamento
         self.bind_all('<F1>', lambda e: self.processar_pagamento("dinheiro"))
@@ -819,9 +831,11 @@ class VendaFrame(ttk.Frame):
         
         # Mostrar pergunta sobre cupom
         self.mostrar_pergunta_cupom()
+        self.modo_pagamento = False
     
     def mostrar_pergunta_cupom(self):
         """Mostra pergunta sobre imprimir cupom não fiscal."""
+        self._limpar_atalhos_principais()
         frame_cupom = tk.Frame(self.painel_esquerdo, bg="#ffffff", relief=tk.RAISED, bd=3)
         frame_cupom.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
@@ -885,12 +899,16 @@ class VendaFrame(ttk.Frame):
             widget.destroy()
         
         # Recriar widgets originais
-        self.criar_barra_atalhos(self.painel_esquerdo)
-        self.criar_campo_entrada(self.painel_esquerdo)
-        self.criar_lista_produtos(self.painel_esquerdo)
+        self._montar_area_venda_esquerda()
+
+        for widget in self.painel_direito_container.winfo_children():
+            widget.destroy()
+        self.criar_painel_direito()
         
         # Restaurar bindings originais
         self.configurar_atalhos()
+        self.atualizar_lista_produtos()
+        self.modo_pagamento = False
         
         # Voltar foco para entrada
         self.entry_codigo.focus()
@@ -900,7 +918,7 @@ class VendaFrame(ttk.Frame):
     def limpar_campo_codigo(self):
         """Limpa o campo de código e volta foco para ele."""
         self.entry_codigo.delete(0, tk.END)
-        self.quantity_multiplier = ""
+        self.quantidade_digitada = ""
         self.label_quantidade.config(text="")
         self.entry_codigo.focus()
         return 'break'

@@ -5,11 +5,12 @@ Serviço de integração com Mercado Pago para PIX.
 import requests
 import json
 import time
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 
 from src.utils.logger import Logger
+from src.services.config_service import config_service
 
 
 class MercadoPagoService:
@@ -40,6 +41,12 @@ class MercadoPagoService:
                 "Content-Type": "application/json"
             }
             
+            cliente_pct, plataforma_pct = config_service.get_pix_split_percentages()
+            valor_decimal = Decimal(str(valor))
+            application_fee = (valor_decimal * plataforma_pct / Decimal("100")).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+
             # Dados do pagamento
             payment_data = {
                 "transaction_amount": float(valor),
@@ -50,7 +57,12 @@ class MercadoPagoService:
                 },
                 "notification_url": self.webhook_url,
                 "date_of_expiration": (datetime.now() + timedelta(minutes=15)).isoformat(),
-                "external_reference": f"PDV_{int(time.time())}"  # Referência única
+                "external_reference": f"PDV_{int(time.time())}",  # Referência única
+                "application_fee": float(application_fee),
+                "metadata": {
+                    "pix_split_cliente_percent": float(cliente_pct),
+                    "pix_split_plataforma_percent": float(plataforma_pct),
+                },
             }
             
             response = requests.post(url, headers=headers, json=payment_data)
