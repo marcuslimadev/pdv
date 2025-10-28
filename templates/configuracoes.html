@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações - PDV System{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h1><i class="bi bi-gear"></i> Configurações do Sistema</h1>
+    <p class="text-muted">Gerencie as configurações PIX e Mercado Pago</p>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" id="configTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="pix-tab" data-bs-toggle="tab" 
+                data-bs-target="#pix" type="button" role="tab">
+            <i class="bi bi-wallet2"></i> PIX
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="mercadopago-tab" data-bs-toggle="tab" 
+                data-bs-target="#mercadopago" type="button" role="tab">
+            <i class="bi bi-credit-card"></i> Mercado Pago
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="configTabContent">
+    <!-- Tab PIX -->
+    <div class="tab-pane fade show active" id="pix" role="tabpanel">
+        <!-- Divisão Fixa -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-info-circle"></i> Divisão de Pagamentos (Fixo)
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <p class="mb-2"><strong>Cliente recebe:</strong></p>
+                        <h3 class="text-success"><span id="pct-cliente-fixo">99</span>%</h3>
+                        <small class="text-muted">de cada pagamento PIX</small>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="mb-2"><strong>Plataforma recebe:</strong></p>
+                        <h3 class="text-info"><span id="pct-plataforma-fixo">1</span>%</h3>
+                        <small class="text-muted">de cada pagamento PIX</small>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="mb-2"><strong>PIX da Plataforma:</strong></p>
+                        <h3 class="text-primary"><span id="pix-plataforma-fixo">92992287144</span></h3>
+                        <small class="text-muted">chave fixa</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dados do Estabelecimento -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-shop"></i> Dados do Estabelecimento
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="chave-pix" class="form-label">Chave PIX</label>
+                    <input type="text" class="form-control" id="chave-pix" 
+                           placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória">
+                    <small class="form-text text-muted">Chave PIX para receber os pagamentos</small>
+                </div>
+
+                <div class="mb-3">
+                    <label for="nome-beneficiario" class="form-label">Nome do Estabelecimento</label>
+                    <input type="text" class="form-control" id="nome-beneficiario" 
+                           placeholder="MEU MERCADINHO">
+                </div>
+
+                <div class="mb-3">
+                    <label for="cidade" class="form-label">Cidade</label>
+                    <input type="text" class="form-control" id="cidade" 
+                           placeholder="SAO PAULO">
+                </div>
+
+                <div class="alert alert-success" id="pix-success" style="display: none;">
+                    <i class="bi bi-check-circle"></i> Configurações PIX salvas com sucesso!
+                </div>
+                <div class="alert alert-danger" id="pix-error" style="display: none;">
+                    <i class="bi bi-exclamation-triangle"></i> <span id="pix-error-msg"></span>
+                </div>
+
+                <button class="btn btn-success" onclick="salvarPix()">
+                    <i class="bi bi-save"></i> Salvar Configurações PIX
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Mercado Pago -->
+    <div class="tab-pane fade" id="mercadopago" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-credit-card"></i> Integração Mercado Pago
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    Configure sua integração com Mercado Pago para aceitar pagamentos PIX online.
+                    <br><small>Obtenha suas credenciais em: 
+                    <a href="https://www.mercadopago.com.br/developers/pt/docs/credentials" target="_blank">
+                        https://www.mercadopago.com.br/developers/pt/docs/credentials
+                    </a>
+                    </small>
+                </div>
+
+                <div class="mb-3">
+                    <label for="mp-token" class="form-label">Access Token</label>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="mp-token" 
+                               placeholder="Insira seu access token do Mercado Pago">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleTokenVisibility()">
+                            <i class="bi bi-eye" id="toggle-icon"></i>
+                        </button>
+                    </div>
+                    <small class="form-text text-muted">Token obtido no painel do Mercado Pago</small>
+                </div>
+
+                <div id="mp-status" class="mb-3" style="display: none;">
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle"></i> Token configurado: <span id="mp-token-mask"></span>
+                    </div>
+                </div>
+
+                <div class="alert alert-success" id="mp-success" style="display: none;">
+                    <i class="bi bi-check-circle"></i> Configurações do Mercado Pago salvas com sucesso!
+                </div>
+                <div class="alert alert-danger" id="mp-error" style="display: none;">
+                    <i class="bi bi-exclamation-triangle"></i> <span id="mp-error-msg"></span>
+                </div>
+
+                <button class="btn btn-success" onclick="salvarMercadoPago()">
+                    <i class="bi bi-save"></i> Salvar Configurações Mercado Pago
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Carrega configurações ao iniciar
+    function carregarConfiguracoes() {
+        // PIX
+        fetch('/api/configuracoes/pix')
+            .then(response => response.json())
+            .then(data => {
+                $('#chave-pix').val(data.chave_pix_cliente || '');
+                $('#nome-beneficiario').val(data.nome_beneficiario || '');
+                $('#cidade').val(data.cidade || '');
+                $('#pct-cliente-fixo').text(data.percentual_cliente_fixo);
+                $('#pct-plataforma-fixo').text(data.percentual_plataforma_fixo);
+                $('#pix-plataforma-fixo').text(data.pix_plataforma_fixo);
+            })
+            .catch(error => console.error('Erro ao carregar configurações PIX:', error));
+
+        // Mercado Pago
+        fetch('/api/configuracoes/mercadopago')
+            .then(response => response.json())
+            .then(data => {
+                if (data.token_configurado) {
+                    $('#mp-token-mask').text(data.token_mask);
+                    $('#mp-status').show();
+                }
+            })
+            .catch(error => console.error('Erro ao carregar configurações MP:', error));
+    }
+
+    // Salvar configurações PIX
+    function salvarPix() {
+        const chave = $('#chave-pix').val().trim();
+        const nome = $('#nome-beneficiario').val().trim();
+        const cidade = $('#cidade').val().trim();
+
+        if (!chave || !nome || !cidade) {
+            $('#pix-error-msg').text('Todos os campos são obrigatórios');
+            $('#pix-error').show();
+            $('#pix-success').hide();
+            return;
+        }
+
+        fetch('/api/configuracoes/pix', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                chave_pix_cliente: chave,
+                nome_beneficiario: nome,
+                cidade: cidade
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.sucesso) {
+                $('#pix-success').show();
+                $('#pix-error').hide();
+                setTimeout(() => $('#pix-success').fadeOut(), 3000);
+            } else {
+                $('#pix-error-msg').text(data.erro || 'Erro ao salvar');
+                $('#pix-error').show();
+                $('#pix-success').hide();
+            }
+        })
+        .catch(error => {
+            $('#pix-error-msg').text('Erro de comunicação');
+            $('#pix-error').show();
+            $('#pix-success').hide();
+        });
+    }
+
+    // Salvar Mercado Pago
+    function salvarMercadoPago() {
+        const token = $('#mp-token').val().trim();
+
+        if (!token) {
+            $('#mp-error-msg').text('Access Token é obrigatório');
+            $('#mp-error').show();
+            $('#mp-success').hide();
+            return;
+        }
+
+        fetch('/api/configuracoes/mercadopago', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({access_token: token})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.sucesso) {
+                $('#mp-success').show();
+                $('#mp-error').hide();
+                $('#mp-token').val('');
+                setTimeout(() => {
+                    $('#mp-success').fadeOut();
+                    carregarConfiguracoes();
+                }, 2000);
+            } else {
+                $('#mp-error-msg').text(data.erro || 'Erro ao salvar');
+                $('#mp-error').show();
+                $('#mp-success').hide();
+            }
+        })
+        .catch(error => {
+            $('#mp-error-msg').text('Erro de comunicação');
+            $('#mp-error').show();
+            $('#mp-success').hide();
+        });
+    }
+
+    // Toggle visibility do token
+    function toggleTokenVisibility() {
+        const input = $('#mp-token');
+        const icon = $('#toggle-icon');
+        
+        if (input.attr('type') === 'password') {
+            input.attr('type', 'text');
+            icon.removeClass('bi-eye').addClass('bi-eye-slash');
+        } else {
+            input.attr('type', 'password');
+            icon.removeClass('bi-eye-slash').addClass('bi-eye');
+        }
+    }
+
+    // Inicializa
+    carregarConfiguracoes();
+</script>
+{% endblock %}

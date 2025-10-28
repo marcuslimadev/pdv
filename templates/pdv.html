@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDV - Ponto de Venda</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            overflow: hidden;
+        }
+        
+        .pdv-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .pdv-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .pdv-body {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        .produtos-panel {
+            flex: 2;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .carrinho-panel {
+            flex: 1;
+            background: white;
+            border-left: 2px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+            max-width: 450px;
+        }
+        
+        .busca-produtos {
+            margin-bottom: 20px;
+        }
+        
+        .produtos-grid {
+            flex: 1;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+            align-content: start;
+        }
+        
+        .produto-card {
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            height: 160px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .produto-card:hover {
+            border-color: #667eea;
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .produto-nome {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        
+        .produto-preco {
+            font-size: 20px;
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .carrinho-header {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .carrinho-itens {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        
+        .carrinho-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .carrinho-footer {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 2px solid #dee2e6;
+        }
+        
+        .total-venda {
+            font-size: 32px;
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .btn-finalizar {
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .estoque-baixo {
+            color: #dc3545;
+            font-size: 11px;
+        }
+        
+        .quantidade-controls {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .quantidade-controls button {
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            font-size: 16px;
+        }
+        
+        .quantidade-controls input {
+            width: 50px;
+            text-align: center;
+            padding: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="pdv-container">
+        <!-- Header -->
+        <div class="pdv-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-0"><i class="bi bi-shop"></i> PDV - Ponto de Venda</h4>
+                    <small>Operador: <strong id="usuario-nome">{{ session.usuario_nome }}</strong></small>
+                </div>
+                <div>
+                    <button class="btn btn-light btn-sm me-2" onclick="abrirCaixa()">
+                        <i class="bi bi-cash-stack"></i> Caixa
+                    </button>
+                    <a href="/dashboard" class="btn btn-light btn-sm me-2">
+                        <i class="bi bi-grid"></i> Dashboard
+                    </a>
+                    <a href="/logout" class="btn btn-danger btn-sm">
+                        <i class="bi bi-box-arrow-right"></i> Sair
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="pdv-body">
+            <!-- Painel de Produtos -->
+            <div class="produtos-panel">
+                <!-- Busca -->
+                <div class="busca-produtos">
+                    <div class="input-group input-group-lg">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="busca-produto" 
+                               placeholder="Digite o nome ou código de barras do produto..." 
+                               autofocus>
+                    </div>
+                </div>
+
+                <!-- Grid de Produtos -->
+                <div class="produtos-grid" id="produtos-grid">
+                    <!-- Produtos serão carregados aqui via JavaScript -->
+                </div>
+            </div>
+
+            <!-- Painel do Carrinho -->
+            <div class="carrinho-panel">
+                <!-- Header do Carrinho -->
+                <div class="carrinho-header">
+                    <h5 class="mb-1"><i class="bi bi-cart"></i> Carrinho</h5>
+                    <small class="text-muted"><span id="carrinho-count">0</span> itens</small>
+                </div>
+
+                <!-- Itens do Carrinho -->
+                <div class="carrinho-itens" id="carrinho-itens">
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-cart-x" style="font-size: 48px;"></i>
+                        <p class="mt-3">Carrinho vazio</p>
+                    </div>
+                </div>
+
+                <!-- Footer com Total e Botões -->
+                <div class="carrinho-footer">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="h5 mb-0">Total:</span>
+                        <span class="total-venda" id="total-venda">R$ 0,00</span>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-danger" onclick="limparCarrinho()">
+                            <i class="bi bi-trash"></i> Limpar
+                        </button>
+                        <button class="btn btn-success btn-finalizar" onclick="finalizarVenda()">
+                            <i class="bi bi-check-circle"></i> Finalizar Venda (F2)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Finalizar Venda -->
+    <div class="modal fade" id="modalPagamento" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-credit-card"></i> Finalizar Venda</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h3 class="text-success mb-3">Total: <span id="modal-total">R$ 0,00</span></h3>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Forma de Pagamento</label>
+                                <select class="form-select form-select-lg" id="forma-pagamento">
+                                    <option value="dinheiro">💵 Dinheiro</option>
+                                    <option value="cartao_debito">💳 Cartão de Débito</option>
+                                    <option value="cartao_credito">💳 Cartão de Crédito</option>
+                                    <option value="pix">📱 PIX</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3" id="valor-recebido-container">
+                                <label class="form-label">Valor Recebido</label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text">R$</span>
+                                    <input type="number" class="form-control" id="valor-recebido" 
+                                           step="0.01" min="0">
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info" id="troco-container" style="display: none;">
+                                <h5>Troco: <span id="valor-troco">R$ 0,00</span></h5>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Resumo da Venda</h6>
+                            <div id="resumo-itens" class="mb-3" style="max-height: 200px; overflow-y: auto;">
+                                <!-- Resumo dos itens -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success btn-lg" onclick="confirmarVenda()">
+                        <i class="bi bi-check-circle"></i> Confirmar Venda
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let carrinho = [];
+        let produtos = [];
+
+        // Carrega produtos
+        function carregarProdutos(termo = '') {
+            if (!termo) {
+                // Carrega todos os produtos ativos
+                fetch('/api/produtos')
+                    .then(r => r.json())
+                    .then(data => {
+                        produtos = data.filter(p => p.ativo);
+                        renderizarProdutos(produtos);
+                    });
+            } else {
+                // Busca produtos
+                fetch(`/api/pdv/produtos/buscar?q=${encodeURIComponent(termo)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        renderizarProdutos(data);
+                    });
+            }
+        }
+
+        function renderizarProdutos(lista) {
+            const grid = document.getElementById('produtos-grid');
+            
+            if (lista.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-12 text-center text-muted py-5">
+                        <i class="bi bi-search" style="font-size: 48px;"></i>
+                        <p class="mt-3">Nenhum produto encontrado</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = lista.map(p => `
+                <div class="produto-card" onclick="adicionarAoCarrinho(${p.id})">
+                    <div>
+                        <div class="produto-nome">${p.nome}</div>
+                        <small class="text-muted">${p.codigo_barras || 'S/Código'}</small>
+                        ${p.estoque_atual < 10 ? `<div class="estoque-baixo"><i class="bi bi-exclamation-triangle"></i> Est: ${p.estoque_atual}</div>` : ''}
+                    </div>
+                    <div class="produto-preco">R$ ${parseFloat(p.preco_venda).toFixed(2)}</div>
+                </div>
+            `).join('');
+        }
+
+        function adicionarAoCarrinho(produtoId) {
+            fetch(`/api/produtos/${produtoId}`)
+                .then(r => r.json())
+                .then(produto => {
+                    const itemExistente = carrinho.find(i => i.produto.id === produtoId);
+                    
+                    if (itemExistente) {
+                        itemExistente.quantidade++;
+                    } else {
+                        carrinho.push({
+                            produto: produto,
+                            quantidade: 1,
+                            subtotal: parseFloat(produto.preco_venda)
+                        });
+                    }
+                    
+                    atualizarCarrinho();
+                });
+        }
+
+        function atualizarCarrinho() {
+            const container = document.getElementById('carrinho-itens');
+            const count = document.getElementById('carrinho-count');
+            const total = document.getElementById('total-venda');
+
+            if (carrinho.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-cart-x" style="font-size: 48px;"></i>
+                        <p class="mt-3">Carrinho vazio</p>
+                    </div>
+                `;
+                count.textContent = '0';
+                total.textContent = 'R$ 0,00';
+                return;
+            }
+
+            container.innerHTML = carrinho.map((item, index) => {
+                const subtotal = item.quantidade * parseFloat(item.produto.preco_venda);
+                return `
+                    <div class="carrinho-item">
+                        <div style="flex: 1;">
+                            <div><strong>${item.produto.nome}</strong></div>
+                            <small class="text-muted">R$ ${parseFloat(item.produto.preco_venda).toFixed(2)} x ${item.quantidade}</small>
+                        </div>
+                        <div class="text-end">
+                            <div class="quantidade-controls mb-1">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="alterarQuantidade(${index}, -1)">-</button>
+                                <input type="number" class="form-control form-control-sm" value="${item.quantidade}" 
+                                       onchange="setQuantidade(${index}, this.value)" min="1">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="alterarQuantidade(${index}, 1)">+</button>
+                            </div>
+                            <div><strong>R$ ${subtotal.toFixed(2)}</strong></div>
+                            <button class="btn btn-sm btn-danger mt-1" onclick="removerItem(${index})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const totalVenda = carrinho.reduce((sum, item) => 
+                sum + (item.quantidade * parseFloat(item.produto.preco_venda)), 0);
+            
+            count.textContent = carrinho.reduce((sum, item) => sum + item.quantidade, 0);
+            total.textContent = `R$ ${totalVenda.toFixed(2)}`;
+        }
+
+        function alterarQuantidade(index, delta) {
+            carrinho[index].quantidade += delta;
+            if (carrinho[index].quantidade <= 0) {
+                carrinho.splice(index, 1);
+            }
+            atualizarCarrinho();
+        }
+
+        function setQuantidade(index, valor) {
+            const qtd = parseInt(valor);
+            if (qtd > 0) {
+                carrinho[index].quantidade = qtd;
+            } else {
+                carrinho.splice(index, 1);
+            }
+            atualizarCarrinho();
+        }
+
+        function removerItem(index) {
+            carrinho.splice(index, 1);
+            atualizarCarrinho();
+        }
+
+        function limparCarrinho() {
+            if (confirm('Deseja limpar todo o carrinho?')) {
+                carrinho = [];
+                atualizarCarrinho();
+            }
+        }
+
+        function finalizarVenda() {
+            if (carrinho.length === 0) {
+                alert('Carrinho vazio!');
+                return;
+            }
+
+            const totalVenda = carrinho.reduce((sum, item) => 
+                sum + (item.quantidade * parseFloat(item.produto.preco_venda)), 0);
+            
+            document.getElementById('modal-total').textContent = `R$ ${totalVenda.toFixed(2)}`;
+            document.getElementById('valor-recebido').value = totalVenda.toFixed(2);
+            
+            // Resumo dos itens
+            const resumo = carrinho.map(item => `
+                <div class="d-flex justify-content-between mb-2">
+                    <span>${item.quantidade}x ${item.produto.nome}</span>
+                    <strong>R$ ${(item.quantidade * parseFloat(item.produto.preco_venda)).toFixed(2)}</strong>
+                </div>
+            `).join('');
+            document.getElementById('resumo-itens').innerHTML = resumo;
+
+            const modal = new bootstrap.Modal(document.getElementById('modalPagamento'));
+            modal.show();
+        }
+
+        function confirmarVenda() {
+            // Implementar salvamento da venda
+            alert('Venda confirmada! (Implementar salvamento)');
+            carrinho = [];
+            atualizarCarrinho();
+            bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
+        }
+
+        function abrirCaixa() {
+            alert('Funcionalidade de caixa em desenvolvimento');
+        }
+
+        // Calcular troco
+        document.getElementById('valor-recebido')?.addEventListener('input', function() {
+            const totalVenda = carrinho.reduce((sum, item) => 
+                sum + (item.quantidade * parseFloat(item.produto.preco_venda)), 0);
+            const valorRecebido = parseFloat(this.value) || 0;
+            const troco = valorRecebido - totalVenda;
+
+            if (troco >= 0 && document.getElementById('forma-pagamento').value === 'dinheiro') {
+                document.getElementById('troco-container').style.display = 'block';
+                document.getElementById('valor-troco').textContent = `R$ ${troco.toFixed(2)}`;
+            } else {
+                document.getElementById('troco-container').style.display = 'none';
+            }
+        });
+
+        // Controlar visibilidade do valor recebido
+        document.getElementById('forma-pagamento')?.addEventListener('change', function() {
+            if (this.value === 'dinheiro') {
+                document.getElementById('valor-recebido-container').style.display = 'block';
+            } else {
+                document.getElementById('valor-recebido-container').style.display = 'none';
+                document.getElementById('troco-container').style.display = 'none';
+            }
+        });
+
+        // Busca de produtos
+        let buscaTimeout;
+        document.getElementById('busca-produto').addEventListener('input', function() {
+            clearTimeout(buscaTimeout);
+            const termo = this.value.trim();
+            
+            buscaTimeout = setTimeout(() => {
+                carregarProdutos(termo);
+            }, 300);
+        });
+
+        // Atalhos de teclado
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F2') {
+                e.preventDefault();
+                finalizarVenda();
+            }
+        });
+
+        // Inicializa
+        carregarProdutos();
+    </script>
+</body>
+</html>

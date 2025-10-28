@@ -10,21 +10,25 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 
 from src.utils.logger import Logger
-from src.services.config_service import config_service
+from src.services.config_service import config_service, PERCENTUAL_PLATAFORMA, PIX_PLATAFORMA
 
 
 class MercadoPagoService:
     """Serviço para integração com Mercado Pago."""
     
     def __init__(self):
-        # Configurações (em produção, usar variáveis de ambiente)
-        self.access_token = "TEST-YOUR-ACCESS-TOKEN-HERE"  # Token de teste
+        # Access token vem das configurações do banco de dados
         self.base_url = "https://api.mercadopago.com"
         self.webhook_url = "https://your-domain.com/webhook/mercadopago"  # URL do webhook
+    
+    @property
+    def access_token(self) -> str:
+        """Obtém o access token do Mercado Pago das configurações."""
+        return config_service.get_mercadopago_access_token()
         
     def criar_pagamento_pix(self, valor: Decimal, descricao: str = "Venda PDV") -> Optional[Dict[str, Any]]:
         """
-        Cria um pagamento PIX no Mercado Pago.
+        Cria um pagamento PIX no Mercado Pago com split automático.
         
         Args:
             valor: Valor do pagamento
@@ -34,6 +38,10 @@ class MercadoPagoService:
             Dados do pagamento criado ou None se erro
         """
         try:
+            if not self.access_token:
+                Logger.log_erro("MercadoPago", "Access token não configurado")
+                return None
+            
             url = f"{self.base_url}/v1/payments"
             
             headers = {
@@ -41,9 +49,9 @@ class MercadoPagoService:
                 "Content-Type": "application/json"
             }
             
-            cliente_pct, plataforma_pct = config_service.get_pix_split_percentages()
+            # Usa percentual FIXO da plataforma (1%)
             valor_decimal = Decimal(str(valor))
-            application_fee = (valor_decimal * plataforma_pct / Decimal("100")).quantize(
+            application_fee = (valor_decimal * Decimal(str(PERCENTUAL_PLATAFORMA)) / Decimal("100")).quantize(
                 Decimal("0.01"), rounding=ROUND_HALF_UP
             )
 
@@ -60,8 +68,8 @@ class MercadoPagoService:
                 "external_reference": f"PDV_{int(time.time())}",  # Referência única
                 "application_fee": float(application_fee),
                 "metadata": {
-                    "pix_split_cliente_percent": float(cliente_pct),
-                    "pix_split_plataforma_percent": float(plataforma_pct),
+                    "pix_plataforma": PIX_PLATAFORMA,
+                    "percentual_plataforma": PERCENTUAL_PLATAFORMA,
                 },
             }
             

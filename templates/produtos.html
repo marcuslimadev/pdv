@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Produtos - PDV System{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-box-seam"></i> Gestão de Produtos</h1>
+    {% if usuario.usuario_tipo == 'admin' %}
+    <button class="btn btn-success" onclick="novoProduto()">
+        <i class="bi bi-plus-circle"></i> Novo Produto
+    </button>
+    {% endif %}
+</div>
+
+<!-- Filtros e Busca -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="busca-produto" 
+                           placeholder="Buscar por nome ou código...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="filtro-categoria">
+                    <option value="">Todas as Categorias</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="filtro-status">
+                    <option value="">Todos</option>
+                    <option value="ativo">Ativos</option>
+                    <option value="inativo">Inativos</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Produtos -->
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-table"></i> Lista de Produtos
+        <span class="badge bg-primary float-end" id="total-produtos-badge">0</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Código</th>
+                        <th>Nome</th>
+                        <th>Categoria</th>
+                        <th>Preço Venda</th>
+                        <th>Estoque</th>
+                        <th>Status</th>
+                        <th width="120">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="produtos-tbody">
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Carregando...</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let produtos = [];
+    let categorias = {};
+
+    // Carrega produtos
+    function carregarProdutos() {
+        fetch('/api/produtos')
+            .then(response => response.json())
+            .then(data => {
+                produtos = data;
+                renderizarProdutos();
+            })
+            .catch(error => {
+                console.error('Erro ao carregar produtos:', error);
+                $('#produtos-tbody').html(`
+                    <tr>
+                        <td colspan="7" class="text-center text-danger py-4">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Erro ao carregar produtos
+                        </td>
+                    </tr>
+                `);
+            });
+    }
+
+    // Carrega categorias
+    function carregarCategorias() {
+        fetch('/api/categorias')
+            .then(response => response.json())
+            .then(data => {
+                const select = $('#filtro-categoria');
+                data.forEach(cat => {
+                    categorias[cat.id] = cat.nome;
+                    select.append(`<option value="${cat.id}">${cat.nome}</option>`);
+                });
+            });
+    }
+
+    // Renderiza produtos na tabela
+    function renderizarProdutos() {
+        const tbody = $('#produtos-tbody');
+        const busca = $('#busca-produto').val().toLowerCase();
+        const filtroCategoria = $('#filtro-categoria').val();
+        const filtroStatus = $('#filtro-status').val();
+
+        let produtosFiltrados = produtos.filter(p => {
+            const matchBusca = !busca || 
+                p.nome.toLowerCase().includes(busca) ||
+                (p.codigo_barras && p.codigo_barras.includes(busca));
+            
+            const matchCategoria = !filtroCategoria || 
+                p.categoria_id == filtroCategoria;
+            
+            const matchStatus = !filtroStatus ||
+                (filtroStatus === 'ativo' && p.ativo) ||
+                (filtroStatus === 'inativo' && !p.ativo);
+            
+            return matchBusca && matchCategoria && matchStatus;
+        });
+
+        $('#total-produtos-badge').text(produtosFiltrados.length);
+
+        if (produtosFiltrados.length === 0) {
+            tbody.html(`
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                        <p class="mt-2">Nenhum produto encontrado</p>
+                    </td>
+                </tr>
+            `);
+            return;
+        }
+
+        tbody.html(produtosFiltrados.map(p => `
+            <tr>
+                <td>${p.codigo_barras || '-'}</td>
+                <td><strong>${p.nome}</strong></td>
+                <td>${categorias[p.categoria_id] || '-'}</td>
+                <td>R$ ${p.preco_venda.toFixed(2)}</td>
+                <td>
+                    <span class="badge ${p.estoque_atual <= p.estoque_minimo ? 'bg-danger' : 'bg-success'}">
+                        ${p.estoque_atual}
+                    </span>
+                </td>
+                <td>
+                    <span class="badge ${p.ativo ? 'bg-success' : 'bg-secondary'}">
+                        ${p.ativo ? 'Ativo' : 'Inativo'}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" 
+                            onclick="verProduto(${p.id})" title="Visualizar">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    {% if usuario.usuario_tipo == 'admin' %}
+                    <button class="btn btn-sm btn-outline-warning" 
+                            onclick="editarProduto(${p.id})" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    {% endif %}
+                </td>
+            </tr>
+        `).join(''));
+    }
+
+    // Funções de ação
+    function novoProduto() {
+        alert('Funcionalidade em desenvolvimento: Modal para novo produto');
+    }
+
+    function verProduto(id) {
+        fetch(`/api/produtos/${id}`)
+            .then(response => response.json())
+            .then(produto => {
+                alert(`Produto: ${produto.nome}\nPreço: R$ ${produto.preco_venda}\nEstoque: ${produto.estoque_atual}`);
+            });
+    }
+
+    function editarProduto(id) {
+        alert('Funcionalidade em desenvolvimento: Modal para editar produto ' + id);
+    }
+
+    // Event listeners
+    $('#busca-produto').on('input', renderizarProdutos);
+    $('#filtro-categoria, #filtro-status').on('change', renderizarProdutos);
+
+    // Inicializa
+    carregarCategorias();
+    carregarProdutos();
+    setInterval(carregarProdutos, 60000); // Atualiza a cada minuto
+</script>
+{% endblock %}

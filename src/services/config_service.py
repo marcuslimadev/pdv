@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from typing import Tuple
+from typing import Optional
 
 from src.config.database import DatabaseConnection
+
+
+# ==================== CONSTANTES FIXAS DO SISTEMA ====================
+# PIX da plataforma (NÃO PODE SER ALTERADO PELO USUÁRIO)
+PIX_PLATAFORMA = "92992287144"
+
+# Percentuais fixos de divisão (NÃO PODEM SER ALTERADOS PELO USUÁRIO)
+PERCENTUAL_CLIENTE = 99  # 99% para o cliente
+PERCENTUAL_PLATAFORMA = 1  # 1% para a plataforma
+# =====================================================================
 
 
 class ConfigService:
@@ -15,7 +24,10 @@ class ConfigService:
     _CACHE: dict[str, str] = {}
     _TABLE_READY = False
     _DEFAULTS = {
-        "pix_platform_percent": "1.00",
+        "pix_chave_cliente": "",
+        "pix_nome_beneficiario": "MEU MERCADINHO",
+        "pix_cidade": "SAO PAULO",
+        "mercadopago_access_token": "",
     }
 
     @classmethod
@@ -86,32 +98,49 @@ class ConfigService:
 
         cls._CACHE[chave] = valor
 
+    # ==================== CONFIGURAÇÕES PIX CLIENTE ====================
+    
     @classmethod
-    def get_pix_split_percentages(cls) -> Tuple[Decimal, Decimal]:
-        """Retorna percentuais (cliente, plataforma)."""
-        raw = cls.get_config("pix_platform_percent", cls._DEFAULTS["pix_platform_percent"])
-        try:
-            plataforma = Decimal(str(raw or "0"))
-        except (InvalidOperation, TypeError):
-            plataforma = Decimal(cls._DEFAULTS["pix_platform_percent"])
-
-        plataforma = max(
-            Decimal("0"),
-            min(Decimal("100"), plataforma.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)),
-        )
-        cliente = (Decimal("100") - plataforma).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        return cliente, plataforma
-
+    def get_pix_chave_cliente(cls) -> str:
+        """Obtém a chave PIX do cliente."""
+        return cls.get_config("pix_chave_cliente", cls._DEFAULTS["pix_chave_cliente"]) or ""
+    
     @classmethod
-    def set_pix_platform_percent(cls, plataforma: Decimal) -> Tuple[Decimal, Decimal]:
-        """Atualiza percentual da plataforma e devolve (cliente, plataforma)."""
-        plataforma = max(
-            Decimal("0"),
-            min(Decimal("100"), plataforma.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)),
-        )
-        cliente = (Decimal("100") - plataforma).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        cls.set_config("pix_platform_percent", f"{plataforma:.2f}")
-        return cliente, plataforma
+    def set_pix_chave_cliente(cls, chave: str) -> None:
+        """Define a chave PIX do cliente."""
+        cls.set_config("pix_chave_cliente", chave, "Chave PIX do estabelecimento")
+    
+    @classmethod
+    def get_pix_nome_beneficiario(cls) -> str:
+        """Obtém o nome do beneficiário PIX."""
+        return cls.get_config("pix_nome_beneficiario", cls._DEFAULTS["pix_nome_beneficiario"]) or "MEU MERCADINHO"
+    
+    @classmethod
+    def set_pix_nome_beneficiario(cls, nome: str) -> None:
+        """Define o nome do beneficiário PIX."""
+        cls.set_config("pix_nome_beneficiario", nome, "Nome do beneficiário PIX")
+    
+    @classmethod
+    def get_pix_cidade(cls) -> str:
+        """Obtém a cidade do beneficiário PIX."""
+        return cls.get_config("pix_cidade", cls._DEFAULTS["pix_cidade"]) or "SAO PAULO"
+    
+    @classmethod
+    def set_pix_cidade(cls, cidade: str) -> None:
+        """Define a cidade do beneficiário PIX."""
+        cls.set_config("pix_cidade", cidade, "Cidade do beneficiário PIX")
+    
+    # ==================== CONFIGURAÇÕES MERCADO PAGO ====================
+    
+    @classmethod
+    def get_mercadopago_access_token(cls) -> str:
+        """Obtém o access token do Mercado Pago."""
+        return cls.get_config("mercadopago_access_token", cls._DEFAULTS["mercadopago_access_token"]) or ""
+    
+    @classmethod
+    def set_mercadopago_access_token(cls, token: str) -> None:
+        """Define o access token do Mercado Pago."""
+        cls.set_config("mercadopago_access_token", token, "Access Token Mercado Pago")
 
 
 config_service = ConfigService

@@ -9,14 +9,26 @@ from decimal import Decimal
 from datetime import datetime
 import json
 
+from src.services.config_service import config_service
+
 
 class PixService:
     """Serviço para geração de QR Code PIX."""
     
-    # Dados do estabelecimento (configuráveis)
-    CHAVE_PIX = "12345678901"  # CPF/CNPJ/Email/Telefone/Chave aleatória
-    NOME_BENEFICIARIO = "MEU MERCADINHO"
-    CIDADE = "SAO PAULO"
+    @staticmethod
+    def _get_chave_pix() -> str:
+        """Obtém a chave PIX configurada."""
+        return config_service.get_pix_chave_cliente() or "12345678901"
+    
+    @staticmethod
+    def _get_nome_beneficiario() -> str:
+        """Obtém o nome do beneficiário configurado."""
+        return config_service.get_pix_nome_beneficiario() or "MEU MERCADINHO"
+    
+    @staticmethod
+    def _get_cidade() -> str:
+        """Obtém a cidade configurada."""
+        return config_service.get_pix_cidade() or "SAO PAULO"
     
     @staticmethod
     def gerar_payload_pix(valor: Decimal, identificador: str = None) -> str:
@@ -38,10 +50,10 @@ class PixService:
         
         # Formato simplificado do payload PIX
         payload_dict = {
-            "pixKey": PixService.CHAVE_PIX,
+            "pixKey": PixService._get_chave_pix(),
             "description": f"Venda #{identificador}",
-            "merchantName": PixService.NOME_BENEFICIARIO,
-            "merchantCity": PixService.CIDADE,
+            "merchantName": PixService._get_nome_beneficiario(),
+            "merchantCity": PixService._get_cidade(),
             "txid": identificador,
             "amount": str(float(valor))
         }
@@ -125,13 +137,13 @@ class PixService:
             nome_beneficiario: Nome do beneficiário
             cidade: Cidade
         """
-        PixService.CHAVE_PIX = chave
+        config_service.set_pix_chave_cliente(chave)
         
         if nome_beneficiario:
-            PixService.NOME_BENEFICIARIO = nome_beneficiario
+            config_service.set_pix_nome_beneficiario(nome_beneficiario)
         
         if cidade:
-            PixService.CIDADE = cidade
+            config_service.set_pix_cidade(cidade)
     
     @staticmethod
     def validar_chave_pix(chave: str) -> tuple[bool, str]:
