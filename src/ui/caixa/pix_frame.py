@@ -27,6 +27,7 @@ class PIXFrame(tk.Frame):
         
         self.payment_id = None
         self.qr_code_data = None
+        self.timer_ativo = True
         
         self.criar_widgets()
         self.processar_payment_data()
@@ -219,20 +220,27 @@ class PIXFrame(tk.Frame):
     def iniciar_countdown(self, segundos_restantes):
         """Inicia o countdown do PIX."""
         def atualizar_timer():
+            if not self.timer_ativo:
+                return segundos_restantes
+            
             if segundos_restantes > 0:
                 minutos = segundos_restantes // 60
                 segundos = segundos_restantes % 60
-                self.label_timer.config(text=f"⏱️ PIX expira em {minutos:02d}:{segundos:02d} minutos")
-                self.after(1000, lambda: atualizar_timer() if hasattr(self, 'label_timer') else None)
+                if hasattr(self, 'label_timer') and self.label_timer.winfo_exists():
+                    self.label_timer.config(text=f"⏱️ PIX expira em {minutos:02d}:{segundos:02d} minutos")
+                self.after(1000, atualizar_timer)
                 return segundos_restantes - 1
             else:
                 self.pix_expirado()
                 return 0
         
-        segundos_restantes = atualizar_timer()
+        atualizar_timer()
     
     def pagamento_aprovado(self):
         """Callback quando pagamento é aprovado."""
+        # Para o timer
+        self.timer_ativo = False
+        
         self.label_status.config(text="✅ PAGAMENTO PIX APROVADO!", fg="#27ae60")
         
         # Mostra confirmação visual
@@ -243,6 +251,9 @@ class PIXFrame(tk.Frame):
     
     def pagamento_erro(self, motivo: str):
         """Callback quando há erro no pagamento."""
+        # Para o timer
+        self.timer_ativo = False
+        
         self.label_status.config(text=f"❌ {motivo.upper()}", fg="#e74c3c")
         
         # Remove do monitoramento
@@ -254,6 +265,9 @@ class PIXFrame(tk.Frame):
     
     def pix_expirado(self):
         """Callback quando PIX expira."""
+        # Para o timer
+        self.timer_ativo = False
+        
         self.label_status.config(text="⏰ PIX EXPIRADO", fg="#e74c3c")
         
         # Cancela pagamento no Mercado Pago
@@ -282,6 +296,9 @@ class PIXFrame(tk.Frame):
     
     def cancelar_pix(self):
         """Cancela o PIX."""
+        # Para o timer
+        self.timer_ativo = False
+        
         self.label_status.config(text="🔄 Cancelando PIX...", fg="#f39c12")
         
         # Cancela no Mercado Pago

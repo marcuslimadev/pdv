@@ -28,9 +28,8 @@ class MercadoPagoService:
         
     def criar_pagamento_pix(self, valor: Decimal, descricao: str = "Venda PDV") -> Optional[Dict[str, Any]]:
         """
-        Cria um pagamento PIX no Mercado Pago com split automático.
-        99% vai para a chave PIX do cliente
-        1% vai para a chave PIX da plataforma
+        Cria um pagamento PIX no Mercado Pago.
+        Nota: Split não é suportado para pagamentos PIX no Mercado Pago.
         
         Args:
             valor: Valor do pagamento
@@ -44,13 +43,11 @@ class MercadoPagoService:
                 Logger.log_erro("MercadoPago", "Access token não configurado")
                 return None
             
-            # Calcula o split de valores
+            # Para PIX, não há split automático suportado pelo Mercado Pago
             valor_float = float(valor)
-            valor_plataforma = round(valor_float * (PERCENTUAL_PLATAFORMA / 100), 2)  # 1%
-            valor_cliente = round(valor_float - valor_plataforma, 2)  # 99%
             
-            Logger.log_operacao("MercadoPago", "SPLIT_CALCULADO", 
-                              f"Total: R$ {valor_float:.2f} | Cliente (99%): R$ {valor_cliente:.2f} | Plataforma (1%): R$ {valor_plataforma:.2f}".replace('.', ','))
+            Logger.log_operacao("MercadoPago", "PIX_SEM_SPLIT", 
+                              f"PIX criado sem split - Total: R$ {valor_float:.2f}".replace('.', ','))
             
             url = f"{self.base_url}/v1/payments"
             
@@ -64,10 +61,7 @@ class MercadoPagoService:
             expiration_date = datetime.now() + timedelta(minutes=15)
             date_str = expiration_date.strftime("%Y-%m-%dT%H:%M:%S.000-03:00")  # Formato com timezone BR
             
-            # Obtém a chave PIX do cliente das configurações
-            chave_pix_cliente = config_service.get_pix_chave_cliente()
-            
-            # Monta o payload do pagamento
+            # Monta o payload do pagamento PIX (sem split)
             payment_data = {
                 "transaction_amount": valor_float,
                 "description": descricao,
@@ -77,33 +71,13 @@ class MercadoPagoService:
                 },
                 "date_of_expiration": date_str,
                 "external_reference": f"PDV_{int(time.time())}",  # Referência única
+                "metadata": {
+                    "tipo_pagamento": "pix",
+                    "sistema": "PDV",
+                    "split_suportado": False,
+                    "motivo": "Mercado Pago não suporta split para PIX"
+                }
             }
-            
-            # Adiciona split de pagamento se a chave PIX do cliente estiver configurada
-            if chave_pix_cliente:
-                payment_data["application_fee"] = valor_plataforma  # Taxa para a plataforma (1%)
-                
-                # Metadata para rastreamento
-                payment_data["metadata"] = {
-                    "split_cliente": valor_cliente,
-                    "split_plataforma": valor_plataforma,
-                    "percentual_cliente": 99,
-                    "percentual_plataforma": 1,
-                    "chave_pix_cliente": chave_pix_cliente,
-                    "chave_pix_plataforma": PIX_PLATAFORMA
-                }
-                
-                Logger.log_operacao("MercadoPago", "SPLIT_CONFIGURADO", 
-                                  f"Split ativado - Cliente: {chave_pix_cliente} | Plataforma: {PIX_PLATAFORMA}")
-            else:
-                Logger.log_operacao("MercadoPago", "SPLIT_DESABILITADO", 
-                                  "Chave PIX do cliente não configurada - Split desabilitado")
-                
-                # Metadata sem split
-                payment_data["metadata"] = {
-                    "split_habilitado": False,
-                    "motivo": "Chave PIX do cliente não configurada"
-                }
             
             response = requests.post(url, headers=headers, json=payment_data)
             
@@ -182,7 +156,34 @@ class MercadoPagoService:
             Logger.log_erro("MercadoPago", f"Erro ao verificar status: {str(e)}")
             return None
     
-    def cancelar_pagamento(self, payment_id: str) -> bool:
+    def _obter_dados_pagamento(self, payment_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Obtém dados completos de um pagamento (método interno).
+        
+        Args:
+            payment_id: ID do pagamento
+            
+        Returns:
+            Dados completos do pagamento ou None se erro
+        """
+        try:
+            url = f"{self.base_url}/v1/payments/{payment_id}"
+            
+            headers = {
+                "Authorization": f"Bearer {self.access_token}"
+            }
+            
+            response = requests.get(url, headers=headers)
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                Logger.log_erro("MercadoPago", f"Erro ao obter dados do pagamento: {response.text}")
+                return None
+                
+        except Exception as e:
+            Logger.log_erro("MercadoPago", f"Erro ao obter dados do pagamento: {str(e)}")
+            return None
         """
         Cancela um pagamento PIX.
         

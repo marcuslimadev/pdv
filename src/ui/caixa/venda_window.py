@@ -19,7 +19,7 @@ from src.ui.styles import ModernStyles
 class VendaFrame(ttk.Frame):
     """Frame otimizado para operação de caixa por teclado."""
     
-    def __init__(self, parent, usuario: Usuario, caixa: Caixa, callback_fechar_caixa):
+    def __init__(self, parent, usuario: Usuario, caixa: Caixa, callback_fechar_caixa, callback_sair_sistema=None):
         super().__init__(parent)
         
         # CARREGA CONFIGURAÇÕES DE APARÊNCIA DINÂMICAS
@@ -31,6 +31,7 @@ class VendaFrame(ttk.Frame):
         self.usuario = usuario
         self.caixa = caixa
         self.callback_fechar_caixa = callback_fechar_caixa
+        self.callback_sair_sistema = callback_sair_sistema or self._default_sair_sistema
         self.venda_service = VendaService()
         
         # Quantidade multiplicadora (digitar 3 antes de ler código)
@@ -84,6 +85,9 @@ class VendaFrame(ttk.Frame):
         self.bind_all('<F9>', self._handle_f9)              # Fechar caixa
         self.bind_all('<F10>', self._handle_f10)            # Finalizar venda
         
+        # F12: Sair do sistema (voltar para tela inicial)
+        self.bind_all('<F12>', self._handle_f12)            # Voltar para tela inicial
+        
         # ===== ATALHOS COM CTRL (ALTERNATIVOS) =====
         self.bind_all('<Control-n>', lambda e: self.venda_service.iniciar_nova_venda(self.usuario.id, self.caixa.id))
         self.bind_all('<Control-f>', lambda e: self.buscar_produto())
@@ -127,15 +131,26 @@ class VendaFrame(ttk.Frame):
     
     def _handle_f4(self, event):
         """Handler inteligente para F4 - PIX Mercado Pago direto."""
+        Logger().debug("_handle_f4 chamado!")
+        Logger().debug(f"Modo pagamento atual: {self.modo_pagamento}")
+        
         # F4 sempre vai para PIX, seja na venda ou no pagamento
         venda = self.venda_service.get_venda_atual()
+        Logger().debug(f"Venda atual: {venda is not None}")
+        if venda:
+            Logger().debug(f"Venda tem itens: {len(venda.itens) if venda.itens else 0}")
+        
         if venda and venda.itens:
             if not self.modo_pagamento:
                 # Se não está no modo pagamento, vai direto para PIX Mercado Pago
+                Logger().debug("Chamando finalizar_venda_direto_pix()")
                 self.finalizar_venda_direto_pix()
             else:
                 # Se já está no pagamento, processa PIX Mercado Pago
+                Logger().debug("Chamando processar_pagamento('pix')")
                 self.processar_pagamento("pix")
+        else:
+            Logger().debug("Sem venda ou itens - não faz nada")
         return "break"
     
     def _handle_f5(self, event):
@@ -174,6 +189,12 @@ class VendaFrame(ttk.Frame):
         """Handler inteligente para F10."""
         if not self.modo_pagamento:
             self.finalizar_venda()
+        return "break"
+    
+    def _handle_f12(self, event):
+        """Handler para F12 - Voltar para tela inicial (sair do sistema)."""
+        if messagebox.askyesno("Sair do Sistema", "Deseja voltar para a tela inicial?\nO caixa permanecerá aberto."):
+            self.callback_sair_sistema()
         return "break"
     
     def _handle_escape(self, event):
@@ -296,9 +317,11 @@ class VendaFrame(ttk.Frame):
         atalhos = [
             ("F1", "Buscar", ModernStyles.INFO),
             ("F2", "Código", ModernStyles.SUCCESS),
+            ("F4", "PIX", ModernStyles.SUCCESS),
             ("F5", "Remover", ModernStyles.WARNING),
             ("F6", "Cancelar", ModernStyles.DANGER),
             ("F10", "FINALIZAR", ModernStyles.SUCCESS_DARK),
+            ("F12", "SAIR SISTEMA", ModernStyles.DANGER),
         ]
         
         for tecla, texto, cor in atalhos:
@@ -1268,7 +1291,7 @@ class VendaFrame(ttk.Frame):
     
     def processar_pix_mercado_pago(self, venda):
         """Processa PIX via Mercado Pago."""
-        Logger.debug(f"processar_pix_mercado_pago chamado para venda {venda.numero_venda}")
+        Logger().debug(f"processar_pix_mercado_pago chamado para venda {venda.numero_venda}")
         
         # Mostrar tela de loading
         self.mostrar_loading_pix()
@@ -1279,44 +1302,44 @@ class VendaFrame(ttk.Frame):
         # Processar PIX em background
         def processar_async():
             try:
-                Logger.debug("Iniciando thread de processamento PIX...")
+                Logger().debug("Iniciando thread de processamento PIX...")
                 from src.services.mercado_pago_service import MercadoPagoService
                 from src.ui.caixa.pix_frame import PIXFrame
                 
-                Logger.debug("Imports realizados")
+                Logger().debug("Imports realizados")
                 
                 # Instanciar o serviço Mercado Pago
-                Logger.debug("Instanciando MercadoPagoService...")
+                Logger().debug("Instanciando MercadoPagoService...")
                 mp_service = MercadoPagoService()
                 
                 # Criar pagamento PIX
-                Logger.debug(f"Criando pagamento PIX para valor: R$ {float(venda.total):.2f}")
-                Logger.debug("Chamando mp_service.criar_pagamento_pix...")
+                Logger().debug(f"Criando pagamento PIX para valor: R$ {float(venda.total):.2f}")
+                Logger().debug("Chamando mp_service.criar_pagamento_pix...")
                 
                 payment_data = mp_service.criar_pagamento_pix(
                     valor=float(venda.total),
                     descricao=f"Venda PDV #{venda.numero_venda}"
                 )
                 
-                Logger.debug("criar_pagamento_pix RETORNOU!")
-                Logger.debug(f"Payment data recebido: {payment_data is not None}")
+                Logger().debug("criar_pagamento_pix RETORNOU!")
+                Logger().debug(f"Payment data recebido: {payment_data is not None}")
                 if payment_data:
-                    Logger.debug(f"Payment ID: {payment_data.get('id', 'N/A')}")
+                    Logger().debug(f"Payment ID: {payment_data.get('id', 'N/A')}")
                 else:
-                    Logger.debug("Payment data é None!")
+                    Logger().debug("Payment data é None!")
                 
-                Logger.debug("Cancelando timeout...")
+                Logger().debug("Cancelando timeout...")
                 # Cancelar timeout
                 if hasattr(self, '_timeout_pix'):
                     self.after_cancel(self._timeout_pix)
                 
-                Logger.debug("Agendando _finalizar_loading_pix...")
+                Logger().debug("Agendando _finalizar_loading_pix...")
                 # Voltar para thread principal para atualizar UI
                 self.after(0, lambda: self._finalizar_loading_pix(payment_data, venda))
-                Logger.debug("_finalizar_loading_pix agendado!")
+                Logger().debug("_finalizar_loading_pix agendado!")
                 
             except Exception as e:
-                Logger.error(f"Erro no PIX Mercado Pago: {e}")
+                Logger().error(f"Erro no PIX Mercado Pago: {e}")
                 import traceback
                 traceback.print_exc()
                 
@@ -1330,7 +1353,7 @@ class VendaFrame(ttk.Frame):
         import threading
         thread = threading.Thread(target=processar_async, daemon=True)
         thread.start()
-        Logger.debug("Thread iniciada")
+        Logger().debug("Thread iniciada")
     
     def mostrar_loading_pix(self):
         """Mostra tela de loading enquanto gera PIX."""
@@ -1398,24 +1421,24 @@ class VendaFrame(ttk.Frame):
     
     def _finalizar_loading_pix(self, payment_data, venda):
         """Finaliza loading e mostra interface PIX."""
-        Logger.debug(f"_finalizar_loading_pix chamado. Payment data: {payment_data is not None}")
+        Logger().debug(f"_finalizar_loading_pix chamado. Payment data: {payment_data is not None}")
         
         # Para progress bar
         if hasattr(self, 'progress_bar') and self.progress_bar.winfo_exists():
             self.progress_bar.stop()
         
         if payment_data:
-            Logger.debug("Mostrando interface PIX...")
+            Logger().debug("Mostrando interface PIX...")
             # Mostrar interface PIX
             self.mostrar_pix_interface(payment_data, venda)
         else:
-            Logger.debug("Payment data é None, mostrando erro")
+            Logger().debug("Payment data é None, mostrando erro")
             self.mostrar_mensagem_temporaria("❌ Erro ao gerar PIX", "#e74c3c")
             self.voltar_para_venda()
     
     def _erro_loading_pix(self, erro):
         """Mostra erro do loading."""
-        Logger.debug(f"_erro_loading_pix chamado: {erro}")
+        Logger().debug(f"_erro_loading_pix chamado: {erro}")
         # Para progress bar
         if hasattr(self, 'progress_bar') and self.progress_bar.winfo_exists():
             self.progress_bar.stop()
@@ -1425,7 +1448,7 @@ class VendaFrame(ttk.Frame):
     
     def _timeout_loading_pix(self):
         """Timeout do loading PIX."""
-        Logger.debug("Timeout do PIX - 30 segundos")
+        Logger().debug("Timeout do PIX - 30 segundos")
         # Para progress bar
         if hasattr(self, 'progress_bar') and self.progress_bar.winfo_exists():
             self.progress_bar.stop()
@@ -1447,7 +1470,7 @@ class VendaFrame(ttk.Frame):
             self.pix_frame = PIXFrame(
                 parent=self.painel_esquerdo,
                 payment_data=payment_data,
-                callback_aprovado=lambda: self.pix_aprovado(venda),
+                callback_aprovado=lambda: self.pix_aprovado(venda, payment_data.get('id')),
                 callback_cancelado=self.voltar_para_venda
             )
             self.pix_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -1605,9 +1628,10 @@ class VendaFrame(ttk.Frame):
         else:
             messagebox.showerror("Erro", f"Erro ao finalizar venda: {mensagem}")
 
-    def pix_aprovado(self, venda):
+    def pix_aprovado(self, venda, payment_id=None):
         """Callback quando PIX é aprovado."""
         from src.models.pagamento import Pagamento
+        from src.services.pix_split_service import pix_split_service
         
         pagamento = Pagamento(
             forma_pagamento=Pagamento.FORMA_PIX,
@@ -1618,90 +1642,182 @@ class VendaFrame(ttk.Frame):
         sucesso, mensagem, venda_id = self.venda_service.finalizar_venda([pagamento])
         
         if sucesso:
+            # Processa o split em background (não bloqueia a finalização da venda)
+            if payment_id:
+                try:
+                    from threading import Thread
+                    def processar_split_background():
+                        pix_split_service.processar_split_pagamento(
+                            payment_id_original=str(payment_id),
+                            valor_total=venda.total
+                        )
+                    
+                    thread_split = Thread(target=processar_split_background, daemon=True)
+                    thread_split.start()
+                    
+                    Logger.log_operacao("Sistema", "SPLIT_INICIADO", 
+                                      f"Venda {venda_id} - Payment ID: {payment_id} - Valor: R$ {float(venda.total):.2f}")
+                except Exception as e:
+                    Logger.log_erro("SPLIT", f"Erro ao iniciar processamento de split: {str(e)}")
+            
             self.finalizar_venda_com_sucesso()
         else:
             self.mostrar_mensagem_temporaria(f"Erro: {mensagem}", "#e74c3c")
     
     def finalizar_venda_com_sucesso(self):
         """Finaliza venda com sucesso e pergunta sobre cupom."""
-        # Limpar área de pagamento
-        for widget in self.painel_esquerdo.winfo_children():
-            widget.destroy()
+        try:
+            # Limpar área de pagamento
+            if hasattr(self, 'frame_pagamento') and self.frame_pagamento.winfo_exists():
+                for widget in self.frame_pagamento.winfo_children():
+                    if widget.winfo_exists():
+                        widget.destroy()
+            
+            if hasattr(self, 'pix_frame') and self.pix_frame.winfo_exists():
+                self.pix_frame.destroy()
+            
+            # Limpar painel esquerdo
+            if self.painel_esquerdo.winfo_exists():
+                for widget in self.painel_esquerdo.winfo_children():
+                    if widget.winfo_exists():
+                        widget.destroy()
+            
+            # Mostrar pergunta sobre cupom (com timeout automático)
+            self.mostrar_pergunta_cupom()
+            self.modo_pagamento = False
+            
+            # Auto-avançar para nova venda após 5 segundos se não escolher
+            self._timeout_cupom = self.after(5000, self.nova_venda)
         
-        # Mostrar pergunta sobre cupom (com timeout automático)
-        self.mostrar_pergunta_cupom()
-        self.modo_pagamento = False
-        
-        # Auto-avançar para nova venda após 5 segundos se não escolher
-        self._timeout_cupom = self.after(5000, self.nova_venda)
+        except Exception as e:
+            Logger().error(f"Erro ao finalizar venda com sucesso: {e}")
+            # Fallback: vai direto para nova venda
+            try:
+                self.nova_venda()
+            except:
+                pass
     
     def mostrar_pergunta_cupom(self):
         """Mostra pergunta sobre imprimir cupom não fiscal."""
-        # Limpa bindings antigos
-        self._limpar_atalhos_principais()
+        try:
+            # Limpa bindings antigos
+            self._limpar_atalhos_principais()
+            
+            frame_cupom = tk.Frame(self.painel_esquerdo, bg="#ffffff", relief=tk.RAISED, bd=3)
+            frame_cupom.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            
+            # Título
+            titulo_frame = tk.Frame(frame_cupom, bg="#27ae60", height=50)
+            titulo_frame.pack(fill=tk.X)
+            titulo_frame.pack_propagate(False)
+            
+            tk.Label(titulo_frame, text="✅ VENDA FINALIZADA!", font=("Arial", 16, "bold"),
+                     bg="#27ae60", fg="white").pack(expand=True)
+            
+            # Conteúdo
+            content_frame = tk.Frame(frame_cupom, bg="#ffffff")
+            content_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=30)
+            
+            tk.Label(content_frame, text="🎉 Venda realizada com sucesso!", font=("Arial", 16, "bold"),
+                     bg="#ffffff", fg="#27ae60").pack(pady=(0, 20))
+            
+            tk.Label(content_frame, text="Deseja imprimir cupom não fiscal?", font=("Arial", 14),
+                     bg="#ffffff", fg="#2c3e50").pack(pady=(0, 30))
+            
+            # Botões
+            botoes_frame = tk.Frame(content_frame, bg="#ffffff")
+            botoes_frame.pack(fill=tk.X)
+            
+            btn_sim = tk.Button(botoes_frame, text="ENTER - SIM", font=("Arial", 14, "bold"),
+                               bg="#27ae60", fg="white", relief=tk.FLAT, pady=15,
+                               command=self.imprimir_cupom)
+            btn_sim.pack(fill=tk.X, pady=(0, 10))
+            
+            btn_nao = tk.Button(botoes_frame, text="ESC - NÃO", font=("Arial", 14, "bold"),
+                               bg="#95a5a6", fg="white", relief=tk.FLAT, pady=15,
+                               command=self.nova_venda)
+            btn_nao.pack(fill=tk.X)
+            
+            # Status e countdown
+            status_text = tk.Label(content_frame, text="⌨️ ENTER = Imprimir | ESC = Próxima venda", font=("Arial", 10),
+                         bg="#ffffff", fg="#7f8c8d")
+            status_text.pack(pady=(10, 0))
+            
+            self.label_timeout = tk.Label(content_frame, text="⏱️ Próxima venda automática em 5 segundos...", 
+                                          font=("Arial", 9), bg="#ffffff", fg="#95a5a6")
+            self.label_timeout.pack(pady=(5, 0))
+            
+            # Inicia contagem regressiva
+            self._contador_timeout = 5
+            self._atualizar_countdown()
+            
+            # Configurar navegação - handlers específicos para esta tela
+            def handle_enter(e):
+                self.imprimir_cupom()
+                return "break"
+            
+            def handle_escape(e):
+                self.nova_venda()
+                return "break"
+            
+            self.bind_all('<Return>', handle_enter)
+            self.bind_all('<Escape>', handle_escape)
+            
+            # Auto-foco no primeiro botão
+            btn_sim.focus_set()
         
-        frame_cupom = tk.Frame(self.painel_esquerdo, bg="#ffffff", relief=tk.RAISED, bd=3)
-        frame_cupom.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        except Exception as e:
+            Logger().error(f"Erro ao mostrar pergunta cupom: {e}")
+            # Fallback: vai direto para nova venda
+            try:
+                self.nova_venda()
+            except:
+                pass
+    
+    def _default_sair_sistema(self):
+        """Método padrão para sair do sistema - tenta encontrar o método sair no parent."""
+        try:
+            # Tenta chamar o método sair no parent (MainCaixa)
+            if hasattr(self.master, 'sair'):
+                self.master.sair()
+            else:
+                # Fallback: fecha a janela atual
+                self.winfo_toplevel().destroy()
+        except Exception as e:
+            print(f"Erro ao sair do sistema: {e}")
+            # Fallback: fecha a janela atual
+            try:
+                self.winfo_toplevel().destroy()
+            except:
+                pass
+    
+    def _recriar_interface_venda(self):
+        """Recria a interface de venda em caso de erro grave."""
+        try:
+            Logger().info("Recriando interface de venda...")
+            
+            # Limpar tudo
+            for widget in self.winfo_children():
+                if widget.winfo_exists():
+                    widget.destroy()
+            
+            # Recriar widgets principais
+            self.criar_widgets()
+            self.configurar_atalhos()
+            
+            # Focar no campo de código
+            if hasattr(self, 'entry_codigo') and self.entry_codigo.winfo_exists():
+                self.entry_codigo.entry.focus_set()
+            
+            Logger().info("Interface de venda recriada com sucesso")
         
-        # Título
-        titulo_frame = tk.Frame(frame_cupom, bg="#27ae60", height=50)
-        titulo_frame.pack(fill=tk.X)
-        titulo_frame.pack_propagate(False)
-        
-        tk.Label(titulo_frame, text="✅ VENDA FINALIZADA!", font=("Arial", 16, "bold"),
-                 bg="#27ae60", fg="white").pack(expand=True)
-        
-        # Conteúdo
-        content_frame = tk.Frame(frame_cupom, bg="#ffffff")
-        content_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=30)
-        
-        tk.Label(content_frame, text="🎉 Venda realizada com sucesso!", font=("Arial", 16, "bold"),
-                 bg="#ffffff", fg="#27ae60").pack(pady=(0, 20))
-        
-        tk.Label(content_frame, text="Deseja imprimir cupom não fiscal?", font=("Arial", 14),
-                 bg="#ffffff", fg="#2c3e50").pack(pady=(0, 30))
-        
-        # Botões
-        botoes_frame = tk.Frame(content_frame, bg="#ffffff")
-        botoes_frame.pack(fill=tk.X)
-        
-        btn_sim = tk.Button(botoes_frame, text="ENTER - SIM", font=("Arial", 14, "bold"),
-                           bg="#27ae60", fg="white", relief=tk.FLAT, pady=15,
-                           command=self.imprimir_cupom)
-        btn_sim.pack(fill=tk.X, pady=(0, 10))
-        
-        btn_nao = tk.Button(botoes_frame, text="ESC - NÃO", font=("Arial", 14, "bold"),
-                           bg="#95a5a6", fg="white", relief=tk.FLAT, pady=15,
-                           command=self.nova_venda)
-        btn_nao.pack(fill=tk.X)
-        
-        # Status e countdown
-        status_text = tk.Label(content_frame, text="⌨️ ENTER = Imprimir | ESC = Próxima venda", font=("Arial", 10),
-                 bg="#ffffff", fg="#7f8c8d")
-        status_text.pack(pady=(10, 0))
-        
-        self.label_timeout = tk.Label(content_frame, text="⏱️ Próxima venda automática em 5 segundos...", 
-                                      font=("Arial", 9), bg="#ffffff", fg="#95a5a6")
-        self.label_timeout.pack(pady=(5, 0))
-        
-        # Inicia contagem regressiva
-        self._contador_timeout = 5
-        self._atualizar_countdown()
-        
-        # Configurar navegação - handlers específicos para esta tela
-        def handle_enter(e):
-            self.imprimir_cupom()
-            return "break"
-        
-        def handle_escape(e):
-            self.nova_venda()
-            return "break"
-        
-        self.bind_all('<Return>', handle_enter)
-        self.bind_all('<Escape>', handle_escape)
-        
-        # Auto-foco no primeiro botão
-        btn_sim.focus_set()
+        except Exception as e:
+            Logger().error(f"Erro ao recriar interface: {e}")
+            # Último fallback: mostrar mensagem de erro
+            try:
+                messagebox.showerror("Erro Crítico", "Erro na interface. Reinicie o sistema.")
+            except:
+                pass
     
     def _atualizar_countdown(self):
         """Atualiza contador regressivo visual."""
@@ -1724,62 +1840,74 @@ class VendaFrame(ttk.Frame):
     
     def nova_venda(self):
         """Inicia nova venda."""
-        # Cancela timeout automático se existir
-        if hasattr(self, '_timeout_cupom'):
-            self.after_cancel(self._timeout_cupom)
+        try:
+            # Cancela timeout automático se existir
+            if hasattr(self, '_timeout_cupom'):
+                self.after_cancel(self._timeout_cupom)
+            
+            # Primeiro volta para venda (isso já reconfigura os atalhos)
+            self.voltar_para_venda()
+            # Depois executa o callback que reinicia os dados da venda
+            self.callback_venda_finalizada()
         
-        # Primeiro volta para venda (isso já reconfigura os atalhos)
-        self.voltar_para_venda()
-        # Depois executa o callback que reinicia os dados da venda
-        self.callback_venda_finalizada()
+        except Exception as e:
+            Logger().error(f"Erro ao iniciar nova venda: {e}")
+            # Fallback: apenas reinicia os dados da venda
+            try:
+                self.callback_venda_finalizada()
+            except:
+                pass
     
     def voltar_para_venda(self):
         """Volta para a tela de venda."""
-        # Destruir frames de pagamento ou PIX se existirem
-        if hasattr(self, 'frame_pagamento'):
-            try:
-                if self.frame_pagamento.winfo_exists():
-                    self.frame_pagamento.destroy()
-            except:
-                pass
-        
-        if hasattr(self, 'pix_frame'):
-            try:
-                if self.pix_frame.winfo_exists():
-                    self.pix_frame.destroy()
-            except:
-                pass
-        
-        # Limpar qualquer widget filho do painel esquerdo que não seja o container
-        for widget in self.painel_esquerdo.winfo_children():
-            if widget != self.container_esquerdo:
+        try:
+            # Destruir frames de pagamento ou PIX se existirem
+            if hasattr(self, 'frame_pagamento') and self.frame_pagamento.winfo_exists():
+                self.frame_pagamento.destroy()
+            
+            if hasattr(self, 'pix_frame') and self.pix_frame.winfo_exists():
+                self.pix_frame.destroy()
+            
+            # Limpar qualquer widget filho do painel esquerdo que não seja o container
+            if self.painel_esquerdo.winfo_exists():
+                for widget in self.painel_esquerdo.winfo_children():
+                    if widget != self.container_esquerdo and widget.winfo_exists():
+                        try:
+                            widget.destroy()
+                        except:
+                            pass
+                
+                # Mostrar container de venda novamente
+                if self.container_esquerdo.winfo_exists():
+                    self.container_esquerdo.pack(fill=tk.BOTH, expand=True)
+            
+            # Garantir que o frame de venda está visível
+            if hasattr(self, 'painel_busca') and self.painel_busca.winfo_exists() and self.painel_busca.winfo_ismapped():
+                self.painel_busca.ocultar()
+            
+            if hasattr(self, 'frame_venda') and self.frame_venda.winfo_exists():
+                self.frame_venda.pack(fill=tk.BOTH, expand=True)
+            
+            # Restaurar modo venda (importante!)
+            self.modo_pagamento = False
+            
+            # Reconfigurar TODOS os atalhos de teclado para modo venda
+            self.configurar_atalhos()
+            
+            # Atualizar e focar
+            self.atualizar_lista_produtos()
+            
+            if hasattr(self, 'entry_codigo') and self.entry_codigo.winfo_exists():
                 try:
-                    widget.destroy()
+                    self.entry_codigo.entry.focus_set()
                 except:
                     pass
         
-        # Mostrar container de venda novamente
-        self.container_esquerdo.pack(fill=tk.BOTH, expand=True)
-        
-        # Garantir que o frame de venda está visível
-        if hasattr(self, 'painel_busca') and self.painel_busca.winfo_ismapped():
-            self.painel_busca.ocultar()
-        
-        if hasattr(self, 'frame_venda'):
-            self.frame_venda.pack(fill=tk.BOTH, expand=True)
-        
-        # Restaurar modo venda (importante!)
-        self.modo_pagamento = False
-        
-        # Reconfigurar TODOS os atalhos de teclado para modo venda
-        self.configurar_atalhos()
-        
-        # Atualizar e focar
-        self.atualizar_lista_produtos()
-        
-        if hasattr(self, 'entry_codigo'):
+        except Exception as e:
+            Logger().error(f"Erro ao voltar para venda: {e}")
+            # Em caso de erro grave, tenta recriar a interface
             try:
-                self.entry_codigo.entry.focus_set()
+                self._recriar_interface_venda()
             except:
                 pass
     

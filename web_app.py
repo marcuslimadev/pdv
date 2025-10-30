@@ -7,6 +7,7 @@ from flask import Flask, render_template, jsonify, request, session, redirect, u
 from flask_cors import CORS
 from functools import wraps
 from datetime import datetime, timedelta
+from decimal import Decimal
 import os
 import secrets
 
@@ -618,7 +619,66 @@ def api_estatisticas_dashboard():
         return jsonify({'erro': str(e)}), 500
 
 
-# ==================== PÁGINAS WEB ====================
+# ==================== API - MERCADO PAGO WEBHOOK ====================
+
+@app.route('/webhook/mercadopago', methods=['POST'])
+def webhook_mercadopago():
+    """Webhook para receber notificações do Mercado Pago."""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'Dados inválidos'}), 400
+        
+        # Log da notificação recebida
+        Logger.log_operacao("Webhook", "NOTIFICACAO_RECEBIDA", 
+                          f"Tipo: {data.get('type', 'N/A')} - ID: {data.get('data', {}).get('id', 'N/A')}")
+        
+        # Verifica se é uma notificação de pagamento
+        if data.get('type') == 'payment':
+            payment_id = data.get('data', {}).get('id')
+            
+            if payment_id:
+                # Processa em background para não bloquear o webhook
+                from threading import Thread
+                from src.services.mercado_pago_service import mercado_pago_service
+                from src.services.pix_split_service import pix_split_service
+                
+                def processar_webhook_background():
+                    try:
+                        # Verifica status do pagamento
+                        status = mercado_pago_service.verificar_status_pagamento(str(payment_id))
+                        
+                        if status == 'approved':
+                            # Obtém dados do pagamento
+                            payment_data = mercado_pago_service._obter_dados_pagamento(str(payment_id))
+                            
+                            if payment_data:
+                                valor_total = Decimal(str(payment_data.get('transaction_amount', 0)))
+                                
+                                # Processa o split
+                                sucesso = pix_split_service.processar_split_pagamento(
+                                    payment_id_original=str(payment_id),
+                                    valor_total=valor_total
+                                )
+                                
+                                if sucesso:
+                                    Logger.log_operacao("Webhook", "SPLIT_PROCESSADO_WEBHOOK", 
+                                                      f"Payment ID: {payment_id} - Valor: R$ {float(valor_total):.2f}")
+                                else:
+                                    Logger.log_erro("Webhook", f"Falha no processamento do split via webhook: {payment_id}")
+                        
+                    except Exception as e:
+                        Logger.log_erro("Webhook", f"Erro no processamento do webhook: {str(e)}")
+                
+                thread_webhook = Thread(target=processar_webhook_background, daemon=True)
+                thread_webhook.start()
+        
+        return jsonify({'status': 'ok'}), 200
+        
+    except Exception as e:
+        Logger.log_erro("Webhook", f"Erro no webhook: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/produtos')
 @login_required

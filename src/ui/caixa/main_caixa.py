@@ -142,7 +142,7 @@ class MainCaixa:
         
         # Importa e cria a tela de venda
         from src.ui.caixa.venda_window import VendaFrame
-        VendaFrame(self.window, self.usuario, self.caixa_atual, self.fechar_caixa_callback).pack(fill=tk.BOTH, expand=True)
+        VendaFrame(self.window, self.usuario, self.caixa_atual, self.fechar_caixa_callback, self.sair).pack(fill=tk.BOTH, expand=True)
     
     def fechar_caixa_callback(self):
         """Callback para mostrar a tela de fechamento de caixa."""
