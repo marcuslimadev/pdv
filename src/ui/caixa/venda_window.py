@@ -12,6 +12,7 @@ from src.models.caixa import Caixa
 from src.services.venda_service import VendaService
 from src.dao.produto_dao import ProdutoDAO
 from src.utils.formatters import Formatters
+from src.utils.logger import Logger
 from src.ui.styles import ModernStyles
 
 
@@ -1267,7 +1268,7 @@ class VendaFrame(ttk.Frame):
     
     def processar_pix_mercado_pago(self, venda):
         """Processa PIX via Mercado Pago."""
-        print(f"[DEBUG] processar_pix_mercado_pago chamado para venda {venda.numero_venda}")
+        Logger.debug(f"processar_pix_mercado_pago chamado para venda {venda.numero_venda}")
         
         # Mostrar tela de loading
         self.mostrar_loading_pix()
@@ -1278,44 +1279,44 @@ class VendaFrame(ttk.Frame):
         # Processar PIX em background
         def processar_async():
             try:
-                print(f"[DEBUG] Iniciando thread de processamento PIX...")
+                Logger.debug("Iniciando thread de processamento PIX...")
                 from src.services.mercado_pago_service import MercadoPagoService
                 from src.ui.caixa.pix_frame import PIXFrame
                 
-                print(f"[DEBUG] Imports realizados")
+                Logger.debug("Imports realizados")
                 
                 # Instanciar o serviço Mercado Pago
-                print(f"[DEBUG] Instanciando MercadoPagoService...")
+                Logger.debug("Instanciando MercadoPagoService...")
                 mp_service = MercadoPagoService()
                 
                 # Criar pagamento PIX
-                print(f"[DEBUG] Criando pagamento PIX para valor: R$ {float(venda.total):.2f}")
-                print(f"[DEBUG] Chamando mp_service.criar_pagamento_pix...")
+                Logger.debug(f"Criando pagamento PIX para valor: R$ {float(venda.total):.2f}")
+                Logger.debug("Chamando mp_service.criar_pagamento_pix...")
                 
                 payment_data = mp_service.criar_pagamento_pix(
                     valor=float(venda.total),
                     descricao=f"Venda PDV #{venda.numero_venda}"
                 )
                 
-                print(f"[DEBUG] criar_pagamento_pix RETORNOU!")
-                print(f"[DEBUG] Payment data recebido: {payment_data is not None}")
+                Logger.debug("criar_pagamento_pix RETORNOU!")
+                Logger.debug(f"Payment data recebido: {payment_data is not None}")
                 if payment_data:
-                    print(f"[DEBUG] Payment ID: {payment_data.get('id', 'N/A')}")
+                    Logger.debug(f"Payment ID: {payment_data.get('id', 'N/A')}")
                 else:
-                    print(f"[DEBUG] Payment data é None!")
+                    Logger.debug("Payment data é None!")
                 
-                print(f"[DEBUG] Cancelando timeout...")
+                Logger.debug("Cancelando timeout...")
                 # Cancelar timeout
                 if hasattr(self, '_timeout_pix'):
                     self.after_cancel(self._timeout_pix)
                 
-                print(f"[DEBUG] Agendando _finalizar_loading_pix...")
+                Logger.debug("Agendando _finalizar_loading_pix...")
                 # Voltar para thread principal para atualizar UI
                 self.after(0, lambda: self._finalizar_loading_pix(payment_data, venda))
-                print(f"[DEBUG] _finalizar_loading_pix agendado!")
+                Logger.debug("_finalizar_loading_pix agendado!")
                 
             except Exception as e:
-                print(f"[ERROR] Erro no PIX Mercado Pago: {e}")
+                Logger.error(f"Erro no PIX Mercado Pago: {e}")
                 import traceback
                 traceback.print_exc()
                 
@@ -1329,7 +1330,7 @@ class VendaFrame(ttk.Frame):
         import threading
         thread = threading.Thread(target=processar_async, daemon=True)
         thread.start()
-        print(f"[DEBUG] Thread iniciada")
+        Logger.debug("Thread iniciada")
     
     def mostrar_loading_pix(self):
         """Mostra tela de loading enquanto gera PIX."""
@@ -1397,24 +1398,24 @@ class VendaFrame(ttk.Frame):
     
     def _finalizar_loading_pix(self, payment_data, venda):
         """Finaliza loading e mostra interface PIX."""
-        print(f"[DEBUG] _finalizar_loading_pix chamado. Payment data: {payment_data is not None}")
+        Logger.debug(f"_finalizar_loading_pix chamado. Payment data: {payment_data is not None}")
         
         # Para progress bar
         if hasattr(self, 'progress_bar') and self.progress_bar.winfo_exists():
             self.progress_bar.stop()
         
         if payment_data:
-            print(f"[DEBUG] Mostrando interface PIX...")
+            Logger.debug("Mostrando interface PIX...")
             # Mostrar interface PIX
             self.mostrar_pix_interface(payment_data, venda)
         else:
-            print(f"[DEBUG] Payment data é None, mostrando erro")
+            Logger.debug("Payment data é None, mostrando erro")
             self.mostrar_mensagem_temporaria("❌ Erro ao gerar PIX", "#e74c3c")
             self.voltar_para_venda()
     
     def _erro_loading_pix(self, erro):
         """Mostra erro do loading."""
-        print(f"[DEBUG] _erro_loading_pix chamado: {erro}")
+        Logger.debug(f"_erro_loading_pix chamado: {erro}")
         # Para progress bar
         if hasattr(self, 'progress_bar') and self.progress_bar.winfo_exists():
             self.progress_bar.stop()
@@ -1424,7 +1425,7 @@ class VendaFrame(ttk.Frame):
     
     def _timeout_loading_pix(self):
         """Timeout do loading PIX."""
-        print(f"[DEBUG] Timeout do PIX - 30 segundos")
+        Logger.debug("Timeout do PIX - 30 segundos")
         # Para progress bar
         if hasattr(self, 'progress_bar') and self.progress_bar.winfo_exists():
             self.progress_bar.stop()
