@@ -17,8 +17,8 @@ class PagamentoDAO:
         sql = """
             INSERT INTO pagamentos (
                 venda_id, forma_pagamento, valor, numero_parcelas,
-                status, nsu, codigo_autorizacao, dados_pix
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                status, nsu, codigo_autorizacao, dados_pix, valor_pago, troco
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         
         try:
@@ -31,7 +31,9 @@ class PagamentoDAO:
                     pagamento.status,
                     pagamento.nsu,
                     pagamento.codigo_autorizacao,
-                    pagamento.dados_pix
+                    pagamento.dados_pix,
+                    pagamento.valor_pago if pagamento.valor_pago else pagamento.valor,
+                    pagamento.troco if pagamento.troco else 0
                 ))
                 return cursor.lastrowid
         except Exception as e:

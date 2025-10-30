@@ -97,8 +97,10 @@ class MainAdmin:
         self.botoes_menu.append(self.criar_botao_menu(menu_frame, "🏷️ Categorias", self.mostrar_categorias))
         self.botoes_menu.append(self.criar_botao_menu(menu_frame, "📦 Estoque", self.mostrar_estoque))
         self.botoes_menu.append(self.criar_botao_menu(menu_frame, "👥 Usuários", self.mostrar_usuarios))
+        self.botoes_menu.append(self.criar_botao_menu(menu_frame, "↩ Estornos", self.mostrar_estornos))
         self.botoes_menu.append(self.criar_botao_menu(menu_frame, "📈 Relatórios", self.mostrar_relatorios))
         self.botoes_menu.append(self.criar_botao_menu(menu_frame, "⚙️ Configurações", self.mostrar_configuracoes))
+        self.botoes_menu.append(self.criar_botao_menu(menu_frame, "🎨 Aparência", self.mostrar_aparencia))
         
         # Botão sair no final
         tk.Frame(menu_frame, bg="#2c3e50").pack(fill=tk.BOTH, expand=True)
@@ -281,12 +283,23 @@ class MainAdmin:
         from src.ui.admin.relatorios_window import RelatoriosFrame
         RelatoriosFrame(self.area_trabalho).pack(fill=tk.BOTH, expand=True)
     
+    def mostrar_estornos(self):
+        """Mostra a tela de estornos."""
+        self.limpar_area_trabalho()
+        from src.ui.admin.estorno_window import EstornoFrame
+        EstornoFrame(self.area_trabalho, self.usuario).pack(fill=tk.BOTH, expand=True)
+    
     def mostrar_configuracoes(self):
         """Mostra a tela de configurações."""
         self.limpar_area_trabalho()
         from src.ui.admin.configuracoes_window import ConfiguracoesFrame
 
         ConfiguracoesFrame(self.area_trabalho).pack(fill=tk.BOTH, expand=True)
+    
+    def mostrar_aparencia(self):
+        """Mostra a tela de configuração de aparência."""
+        from src.ui.admin.aparencia_window import AparenciaWindow
+        AparenciaWindow(self.window)
     
     def sair(self):
         """Sai do sistema."""

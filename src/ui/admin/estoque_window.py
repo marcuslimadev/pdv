@@ -1,5 +1,6 @@
 """
 Tela de gestão de estoque.
+Inclui alertas visuais de estoque baixo/zerado.
 """
 
 import tkinter as tk
@@ -7,6 +8,7 @@ from tkinter import ttk, messagebox
 
 from src.dao.produto_dao import ProdutoDAO
 from src.utils.formatters import Formatters
+from src.utils.estoque_alerta import EstoqueAlerta
 
 
 class EstoqueFrame(ttk.Frame):
@@ -50,10 +52,16 @@ class EstoqueFrame(ttk.Frame):
         self.tree.heading("status", text="Status")
         
         self.tree.column("codigo", width=120)
-        self.tree.column("nome", width=350)
-        self.tree.column("estoque", width=100)
-        self.tree.column("minimo", width=100)
-        self.tree.column("status", width=120)
+        self.tree.column("nome", width=300)
+        self.tree.column("estoque", width=120)
+        self.tree.column("minimo", width=120)
+        self.tree.column("status", width=150)
+        
+        # Tags de cores para status
+        self.tree.tag_configure('estoque_ok', foreground=EstoqueAlerta.COR_ESTOQUE_OK)
+        self.tree.tag_configure('estoque_baixo', foreground=EstoqueAlerta.COR_ESTOQUE_BAIXO)
+        self.tree.tag_configure('estoque_zero', foreground=EstoqueAlerta.COR_ESTOQUE_ZERO)
+        self.tree.tag_configure('estoque_negativo', foreground=EstoqueAlerta.COR_ESTOQUE_NEGATIVO)
         
         scroll.config(command=self.tree.yview)
         self.tree.pack(fill=tk.BOTH, expand=True)
@@ -69,33 +77,51 @@ class EstoqueFrame(ttk.Frame):
                   padx=20, pady=8, command=self.ajustar_estoque).pack(side=tk.LEFT)
     
     def carregar_produtos(self):
-        """Carrega produtos."""
+        """Carrega produtos com indicadores de estoque."""
         for item in self.tree.get_children():
             self.tree.delete(item)
         
         produtos = ProdutoDAO.buscar_todos()
         for p in produtos:
-            status = "OK"
-            if p.estoque_atual <= 0:
-                status = "SEM ESTOQUE"
-            elif p.estoque_atual <= p.estoque_minimo:
-                status = "ESTOQUE BAIXO"
+            # Verifica alerta de estoque
+            alerta = EstoqueAlerta.verificar_estoque(p.estoque_atual, p.estoque_minimo)
+            
+            # Define tags (ID + tag de cor)
+            tags = (str(p.id), f'estoque_{alerta["nivel"]}')
             
             self.tree.insert("", tk.END, values=(
-                p.codigo_barras or "", p.nome, p.estoque_atual, p.estoque_minimo, status
-            ), tags=(p.id,))
+                p.codigo_barras or "", 
+                p.nome, 
+                p.estoque_atual, 
+                p.estoque_minimo, 
+                alerta['icone'] + " " + alerta['mensagem']
+            ), tags=tags)
     
     def mostrar_estoque_baixo(self):
-        """Mostra apenas produtos com estoque baixo."""
+        """Mostra apenas produtos com estoque baixo e emite alerta."""
         for item in self.tree.get_children():
             self.tree.delete(item)
         
         produtos = ProdutoDAO.buscar_estoque_baixo()
+        
+        if not produtos:
+            messagebox.showinfo("Estoque", "Nenhum produto com estoque baixo!")
+            return
+        
+        # Emite beep de alerta
+        EstoqueAlerta.emitir_beep_estoque('baixo', repetir=1)
+        
         for p in produtos:
-            status = "SEM ESTOQUE" if p.estoque_atual <= 0 else "ESTOQUE BAIXO"
+            alerta = EstoqueAlerta.verificar_estoque(p.estoque_atual, p.estoque_minimo)
+            tags = (str(p.id), f'estoque_{alerta["nivel"]}')
+            
             self.tree.insert("", tk.END, values=(
-                p.codigo_barras or "", p.nome, p.estoque_atual, p.estoque_minimo, status
-            ), tags=(p.id,))
+                p.codigo_barras or "", 
+                p.nome, 
+                p.estoque_atual, 
+                p.estoque_minimo, 
+                alerta['icone'] + " " + alerta['mensagem']
+            ), tags=tags)
     
     def ajustar_estoque(self):
         """Ajusta estoque do produto."""

@@ -121,9 +121,10 @@ class MainCaixa:
                 caixa.id = caixa_id
                 self.caixa_atual = caixa
                 
+                from src.utils.formatters import Formatters
                 messagebox.showinfo(
                     "Sucesso",
-                    f"Caixa aberto com sucesso!\n\nValor inicial: R$ {float(valor_abertura):.2f}"
+                    f"Caixa aberto com sucesso!\n\nValor inicial: {Formatters.formatar_moeda(valor_abertura)}"
                 )
                 
                 self.iniciar_frente_caixa()
@@ -169,9 +170,10 @@ class MainCaixa:
         info_frame = tk.Frame(container, bg="#ecf0f1", relief=tk.RAISED, bd=2)
         info_frame.pack(pady=(0, 30), padx=40, fill=tk.X)
         
+        from src.utils.formatters import Formatters
         tk.Label(
             info_frame,
-            text=f"Valor de Abertura: R$ {float(self.caixa_atual.valor_abertura):.2f}",
+            text=f"Valor de Abertura: {Formatters.formatar_moeda(self.caixa_atual.valor_abertura)}",
             font=("Arial", 12),
             bg="#ecf0f1"
         ).pack(pady=10)
@@ -228,12 +230,13 @@ class MainCaixa:
                 return
             
             # Confirma fechamento
+            from src.utils.formatters import Formatters
             if not messagebox.askyesno(
                 "Confirmar Fechamento",
                 f"Confirmar fechamento do caixa?\n\n"
-                f"Valor de Abertura: R$ {float(self.caixa_atual.valor_abertura):.2f}\n"
-                f"Valor de Fechamento: R$ {float(valor_fechamento):.2f}\n"
-                f"Diferença: R$ {float(valor_fechamento - self.caixa_atual.valor_abertura):.2f}"
+                f"Valor de Abertura: {Formatters.formatar_moeda(self.caixa_atual.valor_abertura)}\n"
+                f"Valor de Fechamento: {Formatters.formatar_moeda(valor_fechamento)}\n"
+                f"Diferença: {Formatters.formatar_moeda(valor_fechamento - self.caixa_atual.valor_abertura)}"
             ):
                 return
             

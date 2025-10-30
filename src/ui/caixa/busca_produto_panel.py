@@ -1,11 +1,13 @@
 """
 Painel inline de busca de produtos (substitui janela popup).
+Inclui alertas visuais e sonoros de estoque.
 """
 
 import tkinter as tk
 from tkinter import ttk
 
 from src.dao.produto_dao import ProdutoDAO
+from src.utils.estoque_alerta import EstoqueAlerta
 
 
 class BuscaProdutoPanel(tk.Frame):
@@ -108,9 +110,18 @@ class BuscaProdutoPanel(tk.Frame):
         self.tree.heading("estoque", text="Estoque")
         
         self.tree.column("codigo", width=120)
-        self.tree.column("nome", width=400)
+        self.tree.column("nome", width=350)
         self.tree.column("preco", width=120, anchor=tk.E)
-        self.tree.column("estoque", width=100, anchor=tk.CENTER)
+        self.tree.column("estoque", width=150, anchor=tk.CENTER)
+        
+        # Tags de cores para estoque
+        self.tree.tag_configure('estoque_ok', foreground=EstoqueAlerta.COR_ESTOQUE_OK)
+        self.tree.tag_configure('estoque_baixo', foreground=EstoqueAlerta.COR_ESTOQUE_BAIXO, 
+                                font=("Arial", 10, "bold"))
+        self.tree.tag_configure('estoque_zero', foreground=EstoqueAlerta.COR_ESTOQUE_ZERO, 
+                                font=("Arial", 10, "bold"))
+        self.tree.tag_configure('estoque_negativo', foreground=EstoqueAlerta.COR_ESTOQUE_NEGATIVO, 
+                                font=("Arial", 10, "bold"))
         
         scrollbar.config(command=self.tree.yview)
         self.tree.pack(fill=tk.BOTH, expand=True)
@@ -179,15 +190,27 @@ class BuscaProdutoPanel(tk.Frame):
         
         self.produtos_cache = produtos
         
-        # Popula árvore
+        # Popula árvore com indicadores de estoque
         from src.utils.formatters import Formatters
         for produto in produtos:
+            # Verifica alerta de estoque
+            alerta = EstoqueAlerta.verificar_estoque(
+                produto.estoque_atual,
+                produto.estoque_minimo
+            )
+            
+            # Formata estoque com ícone
+            estoque_texto = f"{alerta['icone']} {produto.estoque_atual} un."
+            
+            # Define tag para cor
+            tags = [str(produto.id), f'estoque_{alerta["nivel"]}']
+            
             self.tree.insert("", tk.END, values=(
                 produto.codigo_barras or "",
                 produto.nome,
                 Formatters.formatar_moeda(produto.preco_venda),
-                produto.estoque_atual
-            ), tags=(produto.id,))
+                estoque_texto
+            ), tags=tags)
         
         # Auto-seleciona o primeiro
         children = self.tree.get_children()
@@ -252,7 +275,7 @@ class BuscaProdutoPanel(tk.Frame):
         self._filtro_timer = self.after(300, self.buscar)  # 300ms delay
     
     def selecionar(self):
-        """Seleciona o produto."""
+        """Seleciona o produto e emite alerta sonoro se estoque baixo/zero."""
         selecionado = self.tree.selection()
         
         if not selecionado:
@@ -269,6 +292,13 @@ class BuscaProdutoPanel(tk.Frame):
             produto = ProdutoDAO.buscar_por_id(produto_id)
             
             if produto:
+                # Emite alerta sonoro se necessário
+                alerta = EstoqueAlerta.alertar_se_necessario(
+                    produto.estoque_atual,
+                    produto.estoque_minimo,
+                    emitir_som=True
+                )
+                
                 self.ocultar()
                 if self.callback:
                     self.callback(produto)

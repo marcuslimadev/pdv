@@ -32,6 +32,22 @@ class BuscaProdutoWindow:
     
     def criar_widgets(self):
         """Cria os widgets."""
+        # Buscar configurações de aparência
+        from src.services.aparencia_service import AparenciaService
+        aparencia = AparenciaService()
+        config = aparencia.get_configuracoes()
+        
+        fonte = config.get('fonte_principal', 'Segoe UI')
+        tamanho_fonte = config.get('tamanho_fonte_xlarge', 16)  # Usa fonte xlarge para busca
+        
+        # Configurar estilo do Treeview
+        style = ttk.Style()
+        style.configure("Busca.Treeview", 
+                       font=(fonte, tamanho_fonte),
+                       rowheight=int(tamanho_fonte * 2.5))  # Altura proporcional
+        style.configure("Busca.Treeview.Heading",
+                       font=(fonte, tamanho_fonte, "bold"))
+        
         # Container principal
         main_frame = ttk.Frame(self.window, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -80,7 +96,8 @@ class BuscaProdutoWindow:
             tree_frame,
             columns=("codigo", "nome", "preco", "estoque"),
             show="headings",
-            yscrollcommand=scrollbar.set
+            yscrollcommand=scrollbar.set,
+            style="Busca.Treeview"
         )
         
         self.tree.heading("codigo", text="Código")
@@ -169,11 +186,12 @@ class BuscaProdutoWindow:
                 produtos = ProdutoDAO.buscar_por_nome(termo)
         
         # Adiciona produtos
+        from src.utils.formatters import Formatters
         for produto in produtos:
             self.tree.insert("", tk.END, values=(
                 produto.codigo_barras or "",
                 produto.nome,
-                f"R$ {float(produto.preco_venda):.2f}",
+                Formatters.formatar_moeda(produto.preco_venda),
                 produto.estoque_atual
             ), tags=(produto.id,))
         

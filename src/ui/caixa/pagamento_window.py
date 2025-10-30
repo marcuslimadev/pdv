@@ -228,7 +228,7 @@ class PagamentoWindow:
         
         entry_valor = ttk.Entry(frame, font=("Arial", 14), width=15)
         entry_valor.pack(pady=(5, 15))
-        entry_valor.insert(0, f"{float(restante):.2f}")
+        entry_valor.insert(0, f"{float(restante):.2f}".replace('.', ','))
         entry_valor.select_range(0, tk.END)
         entry_valor.focus()
         

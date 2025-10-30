@@ -145,7 +145,7 @@ class VendaService:
         Logger.log_operacao(
             "Sistema", 
             "DESCONTO APLICADO", 
-            f"R$ {float(desconto):.2f}"
+            f"R$ {float(desconto):.2f}".replace('.', ',')
         )
         
         return True, "Desconto aplicado com sucesso"

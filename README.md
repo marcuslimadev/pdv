@@ -41,24 +41,60 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### 4. Configure o MySQL
+### 4. Configure o sistema
 
-Certifique-se de que o MySQL está rodando em:
-- Host: localhost
-- Usuário: root
-- Senha: (sem senha)
+Copie o arquivo de configuração de exemplo e edite com suas credenciais:
 
-### 5. Crie o banco de dados
+```bash
+copy config.ini.example config.ini
+```
+
+Edite `config.ini` com suas configurações:
+
+```ini
+[database]
+host = localhost
+port = 3306
+user = root
+password = SUA_SENHA_MYSQL_AQUI
+database = pdv_sistema
+pool_size = 5
+
+[mercadopago]
+# Credenciais do Mercado Pago (opcional)
+access_token = SEU_ACCESS_TOKEN
+public_key = SEU_PUBLIC_KEY
+
+[pix]
+# Configurações PIX Estático (opcional)
+chave_pix = seu@email.com
+nome_recebedor = Nome da Empresa
+
+[sistema]
+nome_empresa = Nome do Seu Comércio
+cnpj = 00.000.000/0001-00
+```
+
+⚠️ **IMPORTANTE:** 
+- O arquivo `config.ini` contém informações sensíveis e **NÃO** deve ser versionado
+- Use `config.ini.example` como modelo
+- Nunca compartilhe suas credenciais
+
+### 5. Configure o MySQL
+
+Certifique-se de que o MySQL está rodando e configure a senha no `config.ini`
+
+### 6. Crie o banco de dados
 
 Execute o script SQL:
 
 ```bash
-mysql -u root < database/schema.sql
+mysql -u root -p < database/schema.sql
 ```
 
 Ou pelo MySQL Workbench/phpMyAdmin, execute o arquivo `database/schema.sql`
 
-### 6. Execute o sistema
+### 7. Execute o sistema
 
 ```bash
 python main.py

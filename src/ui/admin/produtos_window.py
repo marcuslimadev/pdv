@@ -381,8 +381,8 @@ class ProdutoDialog:
         if self.produto.categoria_nome:
             self.combo_categoria.set(self.produto.categoria_nome)
         
-        self.entry_preco_custo.insert(0, f"{float(self.produto.preco_custo):.2f}")
-        self.entry_preco_venda.insert(0, f"{float(self.produto.preco_venda):.2f}")
+        self.entry_preco_custo.insert(0, f"{float(self.produto.preco_custo):.2f}".replace('.', ','))
+        self.entry_preco_venda.insert(0, f"{float(self.produto.preco_venda):.2f}".replace('.', ','))
         self.entry_estoque.insert(0, str(self.produto.estoque_atual))
         self.entry_estoque_min.insert(0, str(self.produto.estoque_minimo))
         self.combo_unidade.set(self.produto.unidade_medida)

@@ -30,7 +30,9 @@ class Pagamento:
         nsu: str = "",
         codigo_autorizacao: str = "",
         dados_pix: str = "",
-        data_hora: Optional[datetime] = None
+        data_hora: Optional[datetime] = None,
+        valor_pago: Optional[Decimal] = None,
+        troco: Optional[Decimal] = None
     ):
         self.id = id
         self.venda_id = venda_id
@@ -42,6 +44,8 @@ class Pagamento:
         self.codigo_autorizacao = codigo_autorizacao
         self.dados_pix = dados_pix
         self.data_hora = data_hora or datetime.now()
+        self.valor_pago = valor_pago or valor  # Valor efetivamente pago
+        self.troco = troco or Decimal('0.00')  # Troco devolvido
     
     def to_dict(self) -> dict:
         """Converte o objeto para dicionário."""
@@ -55,7 +59,9 @@ class Pagamento:
             'nsu': self.nsu,
             'codigo_autorizacao': self.codigo_autorizacao,
             'dados_pix': self.dados_pix,
-            'data_hora': self.data_hora
+            'data_hora': self.data_hora,
+            'valor_pago': float(self.valor_pago) if self.valor_pago else float(self.valor),
+            'troco': float(self.troco) if self.troco else 0.00
         }
     
     @classmethod
@@ -71,7 +77,9 @@ class Pagamento:
             nsu=data.get('nsu', ''),
             codigo_autorizacao=data.get('codigo_autorizacao', ''),
             dados_pix=data.get('dados_pix', ''),
-            data_hora=data.get('data_hora')
+            data_hora=data.get('data_hora'),
+            valor_pago=Decimal(str(data.get('valor_pago', data.get('valor', 0)))),
+            troco=Decimal(str(data.get('troco', 0)))
         )
     
     def aprovar(self):

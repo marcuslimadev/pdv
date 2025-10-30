@@ -185,3 +185,75 @@ class PixService:
             return True, "Chave Aleatória"
         
         return False, ""
+    
+    def gerar_pix_estatico(self, valor: float, descricao: str = "Pagamento PDV") -> dict:
+        """
+        Gera PIX estático com QR Code.
+        
+        Args:
+            valor: Valor do PIX
+            descricao: Descrição do pagamento
+            
+        Returns:
+            Dados do PIX com QR Code
+        """
+        try:
+            from src.services.config_service import config_service
+            
+            # Obter configurações PIX
+            chave_pix = config_service.get_pix_chave_cliente()
+            nome_beneficiario = config_service.get_pix_nome_beneficiario()
+            cidade = config_service.get_pix_cidade()
+            
+            if not chave_pix:
+                # Usar chave padrão se não configurada
+                chave_pix = "92992287144"  # PIX da plataforma como fallback
+                nome_beneficiario = "MEU MERCADINHO"
+                cidade = "SAO PAULO"
+            
+            # Gerar código PIX simples
+            pix_code = f"PIX:{chave_pix}:R${valor:.2f}:{descricao}".replace('.', ',')
+            
+            # Gerar QR Code
+            qr_code_base64 = self._gerar_qr_code_base64(pix_code)
+            
+            return {
+                "qr_code": pix_code,
+                "qr_code_base64": qr_code_base64,
+                "chave_pix": chave_pix,
+                "nome_beneficiario": nome_beneficiario,
+                "cidade": cidade,
+                "valor": valor,
+                "descricao": descricao
+            }
+            
+        except Exception as e:
+            print(f"Erro ao gerar PIX estático: {str(e)}")
+            return None
+    
+    def _gerar_qr_code_base64(self, data: str) -> str:
+        """Gera QR Code em base64."""
+        try:
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(data)
+            qr.make(fit=True)
+            
+            # Criar imagem
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Converter para base64
+            import base64
+            buffer = BytesIO()
+            img.save(buffer, format='PNG')
+            img_str = base64.b64encode(buffer.getvalue()).decode()
+            
+            return img_str
+            
+        except Exception as e:
+            print(f"Erro ao gerar QR Code: {str(e)}")
+            return "QR_CODE_ERROR"

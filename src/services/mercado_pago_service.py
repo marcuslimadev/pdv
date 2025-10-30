@@ -29,6 +29,8 @@ class MercadoPagoService:
     def criar_pagamento_pix(self, valor: Decimal, descricao: str = "Venda PDV") -> Optional[Dict[str, Any]]:
         """
         Cria um pagamento PIX no Mercado Pago com split automático.
+        99% vai para a chave PIX do cliente
+        1% vai para a chave PIX da plataforma
         
         Args:
             valor: Valor do pagamento
@@ -42,36 +44,66 @@ class MercadoPagoService:
                 Logger.log_erro("MercadoPago", "Access token não configurado")
                 return None
             
+            # Calcula o split de valores
+            valor_float = float(valor)
+            valor_plataforma = round(valor_float * (PERCENTUAL_PLATAFORMA / 100), 2)  # 1%
+            valor_cliente = round(valor_float - valor_plataforma, 2)  # 99%
+            
+            Logger.log_operacao("MercadoPago", "SPLIT_CALCULADO", 
+                              f"Total: R$ {valor_float:.2f} | Cliente (99%): R$ {valor_cliente:.2f} | Plataforma (1%): R$ {valor_plataforma:.2f}".replace('.', ','))
+            
             url = f"{self.base_url}/v1/payments"
             
             headers = {
                 "Authorization": f"Bearer {self.access_token}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "X-Idempotency-Key": f"PDV_{int(time.time() * 1000)}"  # Header obrigatório
             }
             
-            # Usa percentual FIXO da plataforma (1%)
-            valor_decimal = Decimal(str(valor))
-            application_fee = (valor_decimal * Decimal(str(PERCENTUAL_PLATAFORMA)) / Decimal("100")).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
-
-            # Dados do pagamento
+            # Data de expiração: formato ISO 8601 com timezone
+            expiration_date = datetime.now() + timedelta(minutes=15)
+            date_str = expiration_date.strftime("%Y-%m-%dT%H:%M:%S.000-03:00")  # Formato com timezone BR
+            
+            # Obtém a chave PIX do cliente das configurações
+            chave_pix_cliente = config_service.get_pix_chave_cliente()
+            
+            # Monta o payload do pagamento
             payment_data = {
-                "transaction_amount": float(valor),
+                "transaction_amount": valor_float,
                 "description": descricao,
                 "payment_method_id": "pix",
                 "payer": {
-                    "email": "cliente@exemplo.com"  # Email genérico para PDV
+                    "email": "cliente@pdv.com"  # Email genérico
                 },
-                "notification_url": self.webhook_url,
-                "date_of_expiration": (datetime.now() + timedelta(minutes=15)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+                "date_of_expiration": date_str,
                 "external_reference": f"PDV_{int(time.time())}",  # Referência única
-                "application_fee": float(application_fee),
-                "metadata": {
-                    "pix_plataforma": PIX_PLATAFORMA,
-                    "percentual_plataforma": PERCENTUAL_PLATAFORMA,
-                },
             }
+            
+            # Adiciona split de pagamento se a chave PIX do cliente estiver configurada
+            if chave_pix_cliente:
+                payment_data["application_fee"] = valor_plataforma  # Taxa para a plataforma (1%)
+                
+                # Metadata para rastreamento
+                payment_data["metadata"] = {
+                    "split_cliente": valor_cliente,
+                    "split_plataforma": valor_plataforma,
+                    "percentual_cliente": 99,
+                    "percentual_plataforma": 1,
+                    "chave_pix_cliente": chave_pix_cliente,
+                    "chave_pix_plataforma": PIX_PLATAFORMA
+                }
+                
+                Logger.log_operacao("MercadoPago", "SPLIT_CONFIGURADO", 
+                                  f"Split ativado - Cliente: {chave_pix_cliente} | Plataforma: {PIX_PLATAFORMA}")
+            else:
+                Logger.log_operacao("MercadoPago", "SPLIT_DESABILITADO", 
+                                  "Chave PIX do cliente não configurada - Split desabilitado")
+                
+                # Metadata sem split
+                payment_data["metadata"] = {
+                    "split_habilitado": False,
+                    "motivo": "Chave PIX do cliente não configurada"
+                }
             
             response = requests.post(url, headers=headers, json=payment_data)
             
@@ -165,7 +197,8 @@ class MercadoPagoService:
             
             headers = {
                 "Authorization": f"Bearer {self.access_token}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "X-Idempotency-Key": f"PDV_CANCEL_{int(time.time() * 1000)}"
             }
             
             data = {"status": "cancelled"}

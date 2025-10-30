@@ -1,0 +1,42 @@
+# Arquivo de configuração do sistema PDV
+# IMPORTANTE: Não versionar este arquivo! Usar config.ini.example como modelo
+
+[database]
+host = localhost
+port = 3306
+user = root
+password = 123456
+database = pdv_sistema
+pool_size = 5
+
+[mercadopago]
+# Credenciais de produção Mercado Pago
+access_token = SEU_ACCESS_TOKEN_AQUI
+public_key = SEU_PUBLIC_KEY_AQUI
+# Percentual de comissão da plataforma (%)
+percentual_plataforma = 1.0
+# URL de callback para notificações
+webhook_url = https://seu-dominio.com.br/webhook/mercadopago
+
+[pix]
+# Configurações PIX Estático
+chave_pix = seu@email.com
+nome_recebedor = Nome da Empresa
+cidade_recebedor = São Paulo
+
+[sistema]
+# Configurações gerais do sistema
+nome_empresa = PDV Sistema
+cnpj = 00.000.000/0001-00
+endereco = Rua Exemplo, 123
+telefone = (11) 1234-5678
+# Caminho para logs
+log_path = logs
+# Caminho para backups
+backup_path = backups
+# Caminho para relatórios
+reports_path = reports
+# Nível de log (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+log_level = INFO
+# Estoque mínimo padrão para alertas
+estoque_minimo_padrao = 5

@@ -132,6 +132,8 @@ CREATE TABLE pagamentos (
     nsu VARCHAR(50),
     codigo_autorizacao VARCHAR(50),
     dados_pix TEXT,
+    valor_pago DECIMAL(10,2) NULL COMMENT 'Valor efetivamente pago pelo cliente',
+    troco DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Troco devolvido ao cliente',
     data_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (venda_id) REFERENCES vendas(id) ON DELETE CASCADE,
     INDEX idx_venda (venda_id),
@@ -158,6 +160,24 @@ CREATE TABLE movimentacoes_estoque (
     INDEX idx_usuario (usuario_id),
     INDEX idx_data_hora (data_hora)
 ) ENGINE=InnoDB;
+
+-- ========================================
+-- TABELA: estornos
+-- ========================================
+CREATE TABLE estornos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    venda_id INT NOT NULL,
+    usuario_id INT NOT NULL COMMENT 'Admin que autorizou o estorno',
+    data_estorno DATETIME DEFAULT CURRENT_TIMESTAMP,
+    motivo TEXT NOT NULL,
+    valor_estornado DECIMAL(10,2) NOT NULL,
+    observacoes TEXT,
+    FOREIGN KEY (venda_id) REFERENCES vendas(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+    INDEX idx_venda (venda_id),
+    INDEX idx_usuario (usuario_id),
+    INDEX idx_data (data_estorno)
+) ENGINE=InnoDB COMMENT='Registros de estornos de vendas';
 
 -- ========================================
 -- DADOS INICIAIS
